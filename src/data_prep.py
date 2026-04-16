@@ -88,7 +88,11 @@ def prepare_data(config: dict[str, Any]) -> pd.DataFrame:
     # ── 1. Load ────────────────────────────────────────────────────────────────
     data_path = Path(config["data_path"])
     if not data_path.exists():
-        raise FileNotFoundError(f"Data file not found: {data_path}")
+        gcs_path = config.get("gcs_data_path", "")
+        if gcs_path.startswith("gs://"):
+            data_path = _download_from_gcs(gcs_path)
+        else:
+            raise FileNotFoundError(f"Data file not found: {data_path}")
 
     df = pd.read_csv(data_path, parse_dates=[date_col])
 
@@ -167,6 +171,25 @@ def prepare_data(config: dict[str, Any]) -> pd.DataFrame:
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _download_from_gcs(gcs_uri: str) -> Path:
+    """Download a GCS file to /tmp and return the local Path."""
+    import tempfile
+    from google.cloud import storage
+
+    # gs://bucket/path/to/file.csv → bucket, blob_path
+    without_scheme = gcs_uri[len("gs://"):]
+    bucket_name, blob_path = without_scheme.split("/", 1)
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob   = bucket.blob(blob_path)
+
+    suffix = Path(blob_path).suffix
+    tmp    = Path(tempfile.mktemp(suffix=suffix))
+    blob.download_to_filename(str(tmp))
+    print(f"     Downloaded {gcs_uri} → {tmp}")
+    return tmp
 
 def _black_friday_week_starts(years) -> set[pd.Timestamp]:
     """
