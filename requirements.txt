@@ -1,6 +1,6 @@
 # Core modeling
-tensorflow>=2.14,<2.16
-tensorflow-probability>=0.23
+tensorflow>=2.16
+tensorflow-probability>=0.24
 meridian
 
 # Data & numerics
