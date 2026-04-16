@@ -1,18 +1,25 @@
 """
 app/data.py
 ~~~~~~~~~~~
-File I/O layer for the Dash app.
-Reads from outputs/{client_id}/ and configs/.
-All paths resolve relative to the repository root regardless of working directory.
+Data layer for the Dash app.
+
+Primary source: BigQuery (mmm.contributions, mmm.diagnostics, mmm.runs).
+Fallback:       Local files in outputs/{client_id}/ when BQ credentials are absent.
+
+All local paths resolve relative to the repository root regardless of working directory.
 """
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import yaml
+
+_BQ_PROJECT = "meridian-system-493519"
+_BQ_DATASET = "mmm"
 
 REPO_ROOT = Path(__file__).parent.parent
 CONFIGS_DIR = REPO_ROOT / "configs"
@@ -81,8 +88,98 @@ def get_status(client_id: str) -> dict[str, Any]:
     return {"status": "no_run", "client_id": client_id}
 
 
+def load_contributions_bq(client_id: str) -> pd.DataFrame | None:
+    """Query mmm.contributions for the most recent complete run for this client."""
+    try:
+        from google.cloud import bigquery
+        bq = bigquery.Client(project=_BQ_PROJECT)
+        query = f"""
+            SELECT c.*
+            FROM `{_BQ_PROJECT}.{_BQ_DATASET}.contributions` c
+            WHERE c.client_id = @client_id
+              AND c.run_id = (
+                SELECT run_id FROM `{_BQ_PROJECT}.{_BQ_DATASET}.runs`
+                WHERE client_id = @client_id AND status = 'complete'
+                ORDER BY completed_at DESC
+                LIMIT 1
+              )
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ScalarQueryParameter("client_id", "STRING", client_id)]
+        )
+        df = bq.query(query, job_config=job_config).to_dataframe()
+        if df.empty:
+            return None
+        df["date"] = pd.to_datetime(df["date"])
+        return df
+    except Exception:
+        return None
+
+
+def load_diagnostics_bq(client_id: str) -> dict | None:
+    """Query mmm.runs + mmm.diagnostics for the most recent complete run."""
+    try:
+        from google.cloud import bigquery
+        bq = bigquery.Client(project=_BQ_PROJECT)
+
+        runs_query = f"""
+            SELECT run_id, completed_at, model_type, rhat_max, ess_min, converged,
+                   runtime_minutes, n_chains, n_adapt, n_burnin, n_keep,
+                   n_weeks, n_geos, n_channels
+            FROM `{_BQ_PROJECT}.{_BQ_DATASET}.runs`
+            WHERE client_id = @client_id AND status = 'complete'
+            ORDER BY completed_at DESC
+            LIMIT 1
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ScalarQueryParameter("client_id", "STRING", client_id)]
+        )
+        runs_rows = list(bq.query(runs_query, job_config=job_config).result())
+        if not runs_rows:
+            return None
+        run = dict(runs_rows[0])
+        run_id = run["run_id"]
+
+        diag_query = f"""
+            SELECT channel, rhat, ess_bulk
+            FROM `{_BQ_PROJECT}.{_BQ_DATASET}.diagnostics`
+            WHERE run_id = @run_id
+        """
+        diag_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ScalarQueryParameter("run_id", "STRING", run_id)]
+        )
+        diag_rows = list(bq.query(diag_query, job_config=diag_config).result())
+
+        return {
+            "run_id":           run_id,
+            "client_id":        client_id,
+            "completed_at":     str(run.get("completed_at", "")),
+            "model_type":       run.get("model_type"),
+            "rhat_max":         run.get("rhat_max"),
+            "rhat_by_channel":  {r["channel"]: r["rhat"] for r in diag_rows},
+            "ess_min":          run.get("ess_min"),
+            "ess_by_channel":   {r["channel"]: r["ess_bulk"] for r in diag_rows},
+            "converged":        run.get("converged"),
+            "runtime_minutes":  run.get("runtime_minutes"),
+            "n_chains":         run.get("n_chains"),
+            "n_adapt":          run.get("n_adapt"),
+            "n_burnin":         run.get("n_burnin"),
+            "n_keep":           run.get("n_keep"),
+        }
+    except Exception:
+        return None
+
+
+def _has_bq_credentials() -> bool:
+    return bool(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+
+
 def get_contributions(client_id: str) -> pd.DataFrame | None:
-    """Load contributions.csv. Returns None if no model run exists."""
+    """Load contributions — BigQuery first, local file fallback."""
+    if _has_bq_credentials():
+        result = load_contributions_bq(client_id)
+        if result is not None:
+            return result
     path = _output_dir(client_id) / "contributions.csv"
     if not path.exists():
         return None
@@ -90,7 +187,11 @@ def get_contributions(client_id: str) -> pd.DataFrame | None:
 
 
 def get_diagnostics(client_id: str) -> dict | None:
-    """Load diagnostics.json. Returns None if no model run exists."""
+    """Load diagnostics — BigQuery first, local file fallback."""
+    if _has_bq_credentials():
+        result = load_diagnostics_bq(client_id)
+        if result is not None:
+            return result
     path = _output_dir(client_id) / "diagnostics.json"
     if not path.exists():
         return None
