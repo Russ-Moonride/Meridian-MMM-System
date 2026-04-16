@@ -1,62 +1,206 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working in this repository. Read this fully before taking any action.
 
-## Project Overview
+---
 
-This is a **Bayesian Marketing Mix Modeling (MMM)** project for Northspore (a mushroom cultivation company), built on Google's **Meridian** library. The goal is to estimate channel-level ROI across paid and organic marketing channels and provide budget reallocation recommendations to maximize revenue.
+## Project overview
 
-## Environment Setup
+This is a **Bayesian Marketing Mix Modeling (MMM) workbench** built on Google's Meridian library. The goal is not a fully automated pipeline — it is a coherent system that makes the analyst (Russ) faster, more organized, and able to serve more clients without losing the judgment and stakeholder collaboration that makes MMM valuable.
+
+The current client is **Northspore**, a mushroom cultivation company. The system is designed to scale to multiple clients using per-client config files.
+
+---
+
+## What this system is and is not
+
+**It is:**
+- A workbench for running, evaluating, and presenting MMM results
+- A config-driven system where each client has their own settings, priors, and data paths
+- A place where Claude Code is used heavily for EDA, model evaluation, iteration, and refactoring
+- An app-first system — results live in a Dash app, not scattered plot files
+
+**It is not:**
+- A fully automated pipeline that runs without human involvement
+- A system that makes modeling decisions autonomously
+- Production infrastructure — this is an internal analyst tool
+
+---
+
+## Current state of the repo
+
+```
+mmm-pipeline/
+  configs/                    ← per-client JSON configs (active)
+  notebooks/modeling/         ← northspore_model.ipynb (main working notebook)
+  src/
+    data_prep.py              ← EMPTY placeholder — needs refactoring from notebook
+    model_config.py           ← EMPTY placeholder — needs refactoring from notebook
+    utils.py                  ← EMPTY placeholder — needs refactoring from notebook
+  CLAUDE.md                   ← this file
+  requirements.txt            ← needs cleanup (currently a full Anaconda dump)
+```
+
+**Immediate priorities:**
+1. Refactor `src/` modules — extract logic from the notebook into working Python modules
+2. Clean up `requirements.txt` to a lean, minimal file
+3. Build the Dash app skeleton with real Northspore data
+4. Wire up BigQuery for run history and results storage
+
+---
+
+## Environment setup
 
 - Python 3.11.15 (Homebrew), venv at `.venv/`
 - Activate: `source .venv/bin/activate`
-- Install dependencies: `pip install -r requirements.txt`
-- Key dependencies: TensorFlow 2.20.0, tfp-nightly, pandas 2.3.3, arviz 0.19.0
+- Install: `pip install -r requirements.txt`
+- Key dependencies: TensorFlow 2.14+, tensorflow-probability (nightly), pandas, arviz 0.19+, plotly, dash, google-cloud-bigquery, anthropic, papermill
 
 ```bash
 # Launch the main modeling notebook
 jupyter notebook notebooks/modeling/northspore_model.ipynb
 ```
 
-GPU is intentionally disabled in the notebook (`CUDA_VISIBLE_DEVICES=""`); Meridian runs on CPU via MCMC sampling.
+GPU is intentionally disabled (`CUDA_VISIBLE_DEVICES=""`). Meridian runs on CPU via MCMC.
 
-## Architecture
+---
 
-All functional code currently lives in `notebooks/modeling/northspore_model.ipynb`. The `src/` modules (`data_prep.py`, `model_config.py`, `utils.py`) are empty placeholders intended for future refactoring.
+## Modeling pipeline — Northspore
 
-**Modeling pipeline:**
-1. **Data ingestion** — load `data/raw/northspore/NS_mmm_data_Mar26.csv` (weekly, multi-geo)
-2. **Data alignment** — build a complete date × geo multi-index to fill gaps
-3. **Feature engineering** — Black Friday indicator, weekly aggregation, float32 casting
-4. **Meridian input builder** — `DataFrameInputDataBuilder` assembles:
+**Data:** `data/raw/northspore/NS_mmm_data_Mar26.csv`
+- Weekly rows, Monday-aligned dates, 2024-01-01 → 2026-03-31
+- Multiple US states as `geo` column
+
+**Pipeline steps:**
+1. Load CSV → align dates to Monday-start weeks → fill multi-geo gaps
+2. Feature engineering: Black Friday indicator, float32 casting
+3. `DataFrameInputDataBuilder` assembles Meridian inputs:
    - KPI: `Revenue`
-   - Paid media channels (7): Brand, Non-Brand, DVD, Retargeting, Prospecting, Shopping, Amazon — with both `_Cost` and `_Impressions` columns
-   - Organic channels (3): `Facebook_Views`, `Instagram_Views`, `YouTube_Views`
+   - Paid media (7 channels): Brand, Non-Brand, DVD, Retargeting, Prospecting, Shopping, Amazon — each with `_Cost` and `_Impressions`
+   - Organic (3 channels): `Facebook_Views`, `Instagram_Views`, `YouTube_Views`
    - Controls: `black_friday`, `Promo Intensity`, `weekly_average_temp`, `weekly_rainfall`
    - Population: geo-level `population`
-5. **Priors** — `LogNormal` ROI priors per channel; Prospecting has a tighter prior (mean=1.5, scale=0.5) based on a holdout test
-6. **ModelSpec** — 26 knots for baseline trend, 6-week max lag, geometric adstock decay
-7. **Inference** — Meridian runs MCMC (TensorFlow Probability)
-8. **Outputs** — ROI estimates, geo-level maps (PNG + interactive HTML), budget optimization tables
+4. Priors: `LogNormal` ROI per channel. Prospecting has tighter prior (mean=1.5, scale=0.5) based on holdout test
+5. ModelSpec: 26 knots for baseline trend, 6-week max lag, geometric adstock decay
+6. Inference: MCMC via TensorFlow Probability
+7. Outputs: ROI estimates, geo maps (PNG + HTML), budget optimization tables → `outputs/northspore/`
 
-## Data
+**Naming conventions:**
+- Media spend/impressions: `{Channel}_Cost` / `{Channel}_Impressions`
+- Dates must be Monday-aligned before passing to Meridian
+- All tensors cast to `float32`
 
-- **Raw data:** `data/raw/northspore/NS_mmm_data_Mar26.csv`
-  - Weekly rows, Monday-aligned dates, 2024-01-01 → 2026-03-31
-  - Multiple US states as `geo` column
-- Data and output files are in `.gitignore` — do not commit them
-
-## Key Conventions
-
-- All media spend/impression columns follow `{Channel}_Cost` / `{Channel}_Impressions` naming
-- Dates must be aligned to Monday-start weeks before passing to Meridian
-- All tensors cast to `float32` for TF compatibility
-- Outputs go to `outputs/northspore/`; configs go to `configs/`
+---
 
 ## Development workflow
 
-- **Local dev:** Run notebook with reduced sampling for fast iteration
-  - `n_chains=1, n_adapt=200, n_burnin=200, n_keep=200`
-- **Production:** Push to Colab for full sampling
-  - `n_chains=4, n_adapt=500, n_burnin=500, n_keep=500`
-- Never commit data files or model outputs (see .gitignore)
+**Local dev (fast iteration):**
+```python
+n_chains=1, n_adapt=200, n_burnin=200, n_keep=200
+```
+
+**Production (full sampling — run on Colab):**
+```python
+n_chains=4, n_adapt=500, n_burnin=500, n_keep=500
+```
+
+Local dev → iterate in VS Code with Claude Code → push to Colab for full runs via Papermill.
+
+Never commit data files or model outputs (see `.gitignore`).
+
+---
+
+## System architecture
+
+### Layers
+
+**1. Workbench (local — VS Code + Claude Code)**
+- Where all development happens
+- `orchestrator.py` (to be built): reads client queue, triggers runs
+- Per-client `configs/{client_id}.json`: single source of truth per client
+- Claude Code used for: EDA, model evaluation, refactoring, iteration
+
+**2. Compute (Google Colab via Papermill)**
+- Meridian fitting runs on Colab using company GPU allocation
+- Notebooks are parameterized and triggered via Papermill
+- PyMC as a second framework is a **future item** — not in scope now
+- Last-touch attribution comparison is a **future item** — not in scope now
+- Each notebook writes artifacts to GCS on completion
+
+**3. Storage (GCP)**
+- **GCS bucket:** raw model artifacts per run (posteriors `.nc`, `contributions.csv`, `diagnostics.json`, `status.json`)
+- **BigQuery:** structured run history, ROI estimates, reviewer verdicts, diagnostics — used for querying across clients and runs
+
+**4. AI evaluation (Claude API)**
+- `agents/reviewer.py` calls the Anthropic API
+- System prompt is loaded from `program.md` — your encoded expert judgment about what good looks like
+- Returns structured JSON: `overall_verdict`, `flags`, `framework_agreement`, `client_ready`, `summary`
+
+**5. App layer (Dash)**
+- Reads from BigQuery + GCS
+- Four core screens: client list, results view (charts/ROI/curves), diagnostics (RHAT/ESS/flags), config editor
+- Designed for internal use and screen-sharing with clients — not a public-facing product yet
+- Streamlit is acceptable for early POC; Dash is the target
+
+### Artifact schema (per run)
+```
+gs://mmm-pipeline-results/
+  clients/{client_id}/
+    runs/{run_id}/
+      meridian/
+        inference_data.nc
+        diagnostics.json      ← {rhat_max, rhat_by_channel, ess_min, converged, runtime_minutes}
+        contributions.csv     ← {date, channel, contribution, contribution_pct, roi, roi_lower_90, roi_upper_90}
+        status.json           ← {status: complete|failed, run_id, error?}
+      reviewer_report.json    ← Claude's structured verdict
+```
+
+### Client config schema
+```json
+{
+  "client_id": "northspore",
+  "data_path": "gs://mmm-pipeline-results/clients/northspore/data.csv",
+  "output_path": "gs://mmm-pipeline-results/clients/northspore/runs/",
+  "channels": ["Brand", "Non-Brand", "DVD", "Retargeting", "Prospecting", "Shopping", "Amazon"],
+  "organic_channels": ["Facebook_Views", "Instagram_Views", "YouTube_Views"],
+  "date_column": "date",
+  "kpi_column": "Revenue",
+  "prior_expected_roi": {
+    "Brand": [0.8, 3.0],
+    "Prospecting": [1.5, 0.5]
+  },
+  "mcmc_samples": 500,
+  "mcmc_chains": 4,
+  "max_runtime_minutes": 45
+}
+```
+
+---
+
+## Key architectural decisions (do not re-litigate)
+
+These were deliberate choices — don't suggest alternatives unless asked:
+
+- **No full automation.** The system supports the analyst, it doesn't replace them. Human review and stakeholder involvement are intentional parts of the workflow.
+- **Dash over Streamlit** for the app (Streamlit acceptable for early POC only).
+- **BigQuery over SQLite/Postgres** — analyst already manages large BQ datasets and is skilled with it. Fits the GCP stack.
+- **GCS for artifacts** — keeps everything in one GCP ecosystem alongside Colab and BigQuery.
+- **Colab compute** — company has existing GPU allocation; no need for Modal or external compute costs.
+- **Meridian only for now** — PyMC is a future validation framework, not current scope.
+- **Claude API for reviewer agent** — not a rules-based evaluator; Claude reads `program.md` and applies judgment.
+- **Single client first** — build for Northspore end to end before adding the second client.
+
+---
+
+## program.md
+
+`program.md` (to be created at repo root) is the system prompt for the reviewer agent. It encodes the analyst's expert judgment: convergence thresholds, ROI plausibility ranges by channel type, cross-framework agreement rules, and red flags for non-technical client communication. When building or editing the reviewer agent, always load this file as the system prompt — never hardcode evaluation logic in the Python code itself.
+
+---
+
+## Files never to commit
+- `data/` — all raw and processed data
+- `outputs/` — model artifacts and plots
+- `.env` — API keys (ANTHROPIC_API_KEY, GCS credentials)
+- `*.nc` — InferenceData posteriors
+- Any file matching patterns in `.gitignore`
