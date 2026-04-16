@@ -30,22 +30,40 @@ The current client is **Northspore**, a mushroom cultivation company. The system
 ## Current state of the repo
 
 ```
-mmm-pipeline/
-  configs/                    ← per-client JSON configs (active)
-  notebooks/modeling/         ← northspore_model.ipynb (main working notebook)
+mmm-workspace/
+  configs/
+    Freedom_Power.yaml        ← EMPTY — needs to be filled in
+  notebooks/
+    modeling/
+      NorthSpore/
+        northspore_model.ipynb   ← main working notebook (Northspore)
+      Freedom_Power/
+        Freedom_Power_model.ipynb ← second client notebook
+    eda/
+      Freedom_Power/           ← empty, EDA not started
+  data/
+    raw/
+      northspore/              ← NS_mmm_data_Mar26.csv (gitignored)
+      Freedom_Power/           ← Freedom_MMM_data_Mar26.csv (gitignored)
+    processed/
+      Freedom_Power/           ← empty
   src/
     data_prep.py              ← EMPTY placeholder — needs refactoring from notebook
     model_config.py           ← EMPTY placeholder — needs refactoring from notebook
     utils.py                  ← EMPTY placeholder — needs refactoring from notebook
+  outputs/
+    northspore/               ← gitignored
+    Freedom_Power/            ← gitignored
   CLAUDE.md                   ← this file
-  requirements.txt            ← needs cleanup (currently a full Anaconda dump)
+  requirements.txt            ← needs cleanup (currently a full Anaconda dump, 456 lines)
 ```
 
 **Immediate priorities:**
-1. Refactor `src/` modules — extract logic from the notebook into working Python modules
-2. Clean up `requirements.txt` to a lean, minimal file
-3. Build the Dash app skeleton with real Northspore data
-4. Wire up BigQuery for run history and results storage
+1. Fill in `configs/Freedom_Power.yaml` with the Freedom Power client config
+2. Refactor `src/` modules — extract logic from the notebook into working Python modules
+3. Clean up `requirements.txt` to a lean, minimal file
+4. Build the Dash app skeleton with real Northspore data
+5. Wire up BigQuery for run history and results storage
 
 ---
 
@@ -57,8 +75,11 @@ mmm-pipeline/
 - Key dependencies: TensorFlow 2.14+, tensorflow-probability (nightly), pandas, arviz 0.19+, plotly, dash, google-cloud-bigquery, anthropic, papermill
 
 ```bash
-# Launch the main modeling notebook
-jupyter notebook notebooks/modeling/northspore_model.ipynb
+# Launch the Northspore modeling notebook
+jupyter notebook notebooks/modeling/NorthSpore/northspore_model.ipynb
+
+# Launch the Freedom Power modeling notebook
+jupyter notebook notebooks/modeling/Freedom_Power/Freedom_Power_model.ipynb
 ```
 
 GPU is intentionally disabled (`CUDA_VISIBLE_DEVICES=""`). Meridian runs on CPU via MCMC.
@@ -70,6 +91,9 @@ GPU is intentionally disabled (`CUDA_VISIBLE_DEVICES=""`). Meridian runs on CPU 
 **Data:** `data/raw/northspore/NS_mmm_data_Mar26.csv`
 - Weekly rows, Monday-aligned dates, 2024-01-01 → 2026-03-31
 - Multiple US states as `geo` column
+
+**Freedom Power data:** `data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv`
+- Same weekly structure; config in `configs/Freedom_Power.yaml` (currently empty — needs populating)
 
 **Pipeline steps:**
 1. Load CSV → align dates to Monday-start weeks → fill multi-geo gaps
@@ -156,23 +180,33 @@ gs://mmm-pipeline-results/
 ```
 
 ### Client config schema
-```json
-{
-  "client_id": "northspore",
-  "data_path": "gs://mmm-pipeline-results/clients/northspore/data.csv",
-  "output_path": "gs://mmm-pipeline-results/clients/northspore/runs/",
-  "channels": ["Brand", "Non-Brand", "DVD", "Retargeting", "Prospecting", "Shopping", "Amazon"],
-  "organic_channels": ["Facebook_Views", "Instagram_Views", "YouTube_Views"],
-  "date_column": "date",
-  "kpi_column": "Revenue",
-  "prior_expected_roi": {
-    "Brand": [0.8, 3.0],
-    "Prospecting": [1.5, 0.5]
-  },
-  "mcmc_samples": 500,
-  "mcmc_chains": 4,
-  "max_runtime_minutes": 45
-}
+
+Configs are YAML files at `configs/{client_id}.yaml`. Example:
+
+```yaml
+client_id: northspore
+data_path: gs://mmm-pipeline-results/clients/northspore/data.csv
+output_path: gs://mmm-pipeline-results/clients/northspore/runs/
+channels:
+  - Brand
+  - Non-Brand
+  - DVD
+  - Retargeting
+  - Prospecting
+  - Shopping
+  - Amazon
+organic_channels:
+  - Facebook_Views
+  - Instagram_Views
+  - YouTube_Views
+date_column: date
+kpi_column: Revenue
+prior_expected_roi:
+  Brand: [0.8, 3.0]
+  Prospecting: [1.5, 0.5]
+mcmc_samples: 500
+mcmc_chains: 4
+max_runtime_minutes: 45
 ```
 
 ---
@@ -188,7 +222,7 @@ These were deliberate choices — don't suggest alternatives unless asked:
 - **Colab compute** — company has existing GPU allocation; no need for Modal or external compute costs.
 - **Meridian only for now** — PyMC is a future validation framework, not current scope.
 - **Claude API for reviewer agent** — not a rules-based evaluator; Claude reads `program.md` and applies judgment.
-- **Single client first** — build for Northspore end to end before adding the second client.
+- **Two active clients** — Northspore (primary, further along) and Freedom Power (data + notebook exist, config not yet filled in). Build Northspore end to end first; Freedom Power follows the same pattern.
 
 ---
 
