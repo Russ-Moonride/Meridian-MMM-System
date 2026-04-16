@@ -118,19 +118,38 @@ GPU is intentionally disabled (`CUDA_VISIBLE_DEVICES=""`). Meridian runs on CPU 
 
 ## Development workflow
 
-**Local dev (fast iteration):**
-```python
-n_chains=1, n_adapt=200, n_burnin=200, n_keep=200
-```
+**Standard workflow — follow this every time:**
+1. Experiment in the modeling notebook — test priors, inspect diagnostics, iterate on model spec
+2. Run the "Save settings" cell at the bottom of the notebook to write params to `configs/{client}.yaml`
+3. `git push` — Colab always clones fresh from `main`; unpushed changes are silently ignored
+4. Open `notebooks/colab_runner.ipynb` in Colab → edit Cell 5 (`CLIENT`, `MODE`) → Runtime → Run All
+5. Results write to `outputs/{client}/` and BigQuery automatically
+6. App reads from BigQuery
 
-**Production (full sampling — run on Colab):**
-```python
-n_chains=4, n_adapt=500, n_burnin=500, n_keep=500
-```
+**Modeling notebooks** (experimentation only — no production output writing):
+- Northspore: `notebooks/modeling/NorthSpore/northspore_model.ipynb`
+- Freedom Power: `notebooks/modeling/Freedom_Power/Freedom_Power_model.ipynb`
 
-Local dev → iterate in VS Code with Claude Code → push to Colab for full runs via Papermill.
+**Running `run_model.py` locally is for debugging only**, not normal workflow. Production runs go through Colab.
+
+See `docs/COLAB_SETUP.md` for full setup and one-time credential instructions.
 
 Never commit data files or model outputs (see `.gitignore`).
+
+---
+
+## Colab execution
+
+`notebooks/colab_runner.ipynb` clones the repo, installs dependencies, mounts credentials from Google Drive, and executes `scripts/run_model.py` unchanged. It is the only sanctioned way to run production model jobs.
+
+**MCMC modes:**
+
+| Mode | Chains | Adapt | Burnin | Keep | Typical runtime |
+|---|---|---|---|---|---|
+| `dev` | 1 | 200 | 200 | 200 | ~5 min |
+| `prod` | 4 | 500 | 500 | 500 | ~30–45 min |
+
+**Future migration:** `future/` contains Vertex AI Custom Job files (Dockerfile, submit_job.py, setup scripts) for when the team moves off Colab. See `future/README.md`.
 
 ---
 
@@ -144,12 +163,12 @@ Never commit data files or model outputs (see `.gitignore`).
 - Per-client `configs/{client_id}.json`: single source of truth per client
 - Claude Code used for: EDA, model evaluation, refactoring, iteration
 
-**2. Compute (Google Colab via Papermill)**
+**2. Compute (Google Colab)**
 - Meridian fitting runs on Colab using company GPU allocation
-- Notebooks are parameterized and triggered via Papermill
+- `notebooks/colab_runner.ipynb` clones the repo and executes `scripts/run_model.py`
+- Config is locked in `configs/{client}.yaml` before each run via the notebook's save-to-config cell
 - PyMC as a second framework is a **future item** — not in scope now
 - Last-touch attribution comparison is a **future item** — not in scope now
-- Each notebook writes artifacts to GCS on completion
 
 **3. Storage (GCP)**
 - **GCS bucket:** raw model artifacts per run (posteriors `.nc`, `contributions.csv`, `diagnostics.json`, `status.json`)

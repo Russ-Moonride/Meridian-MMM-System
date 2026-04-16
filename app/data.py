@@ -3,7 +3,7 @@ app/data.py
 ~~~~~~~~~~~
 Data layer for the Dash app.
 
-Primary source: BigQuery (mmm.contributions, mmm.diagnostics, mmm.runs).
+Primary source: BigQuery (mmm_results.contributions, mmm_results.diagnostics, mmm_results.runs).
 Fallback:       Local files in outputs/{client_id}/ when BQ credentials are absent.
 
 All local paths resolve relative to the repository root regardless of working directory.
@@ -18,8 +18,8 @@ from typing import Any
 import pandas as pd
 import yaml
 
-_BQ_PROJECT = "meridian-system-493519"
-_BQ_DATASET = "mmm"
+_BQ_PROJECT = "moonride-491921"
+_BQ_DATASET = "mmm_results"
 
 REPO_ROOT = Path(__file__).parent.parent
 CONFIGS_DIR = REPO_ROOT / "configs"

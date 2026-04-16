@@ -7,13 +7,14 @@ Public API
 ----------
 write_run(client_id, run_id, outputs_dir)
 
-Tables written (project=meridian-system-493519, dataset=mmm):
-  mmm.runs          — one row per run
-  mmm.diagnostics   — one row per paid channel per run
-  mmm.contributions — one row per channel per week per run
+Tables written (project=moonride-491921, dataset=mmm_results):
+  mmm_results.runs          — one row per run
+  mmm_results.diagnostics   — one row per paid channel per run
+  mmm_results.contributions — one row per channel per week per run
 
 Tables are created automatically on first write if they don't exist.
 Authentication uses GOOGLE_APPLICATION_CREDENTIALS env variable.
+Uses batch load jobs (load_table_from_dataframe) — works on all GCP tiers.
 """
 from __future__ import annotations
 
@@ -24,8 +25,8 @@ from typing import Any
 import pandas as pd
 from google.cloud import bigquery
 
-PROJECT = "meridian-system-493519"
-DATASET = "mmm"
+PROJECT = "moonride-491921"
+DATASET = "mmm_results"
 
 # ── Table schemas ─────────────────────────────────────────────────────────────
 
@@ -106,10 +107,24 @@ def _run_exists(bq: bigquery.Client, run_id: str) -> bool:
     return result.total_rows > 0
 
 
-def _insert(bq: bigquery.Client, table_id: str, rows: list[dict]) -> None:
-    errors = bq.insert_rows_json(f"{PROJECT}.{DATASET}.{table_id}", rows)
-    if errors:
-        raise RuntimeError(f"BigQuery insert failed for {table_id}: {errors}")
+_TABLE_SCHEMAS = {
+    "runs":          _RUNS_SCHEMA,
+    "diagnostics":   _DIAGNOSTICS_SCHEMA,
+    "contributions": _CONTRIBUTIONS_SCHEMA,
+}
+
+
+def _load_df(bq: bigquery.Client, table_id: str, df: pd.DataFrame) -> None:
+    """Append df to table using a batch load job (works on all GCP tiers)."""
+    table_ref = f"{PROJECT}.{DATASET}.{table_id}"
+    job_config = bigquery.LoadJobConfig(
+        schema=_TABLE_SCHEMAS[table_id],
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+    )
+    job = bq.load_table_from_dataframe(df, table_ref, job_config=job_config)
+    job.result()  # block until complete
+    if job.errors:
+        raise RuntimeError(f"BigQuery load job failed for {table_id}: {job.errors}")
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -143,7 +158,7 @@ def write_run(client_id: str, run_id: str, outputs_dir: str | Path) -> None:
         print(f"run_id '{run_id}' already exists in {DATASET}.runs — skipping BigQuery write.")
         return
 
-    # ── mmm.runs ──────────────────────────────────────────────────────────────
+    # ── mmm_results.runs ──────────────────────────────────────────────────────
     runs_row: dict[str, Any] = {
         "run_id":           run_id,
         "client_id":        client_id,
@@ -162,10 +177,10 @@ def write_run(client_id: str, run_id: str, outputs_dir: str | Path) -> None:
         "converged":        diagnostics.get("converged"),
         "runtime_minutes":  diagnostics.get("runtime_minutes"),
     }
-    _insert(bq, "runs", [runs_row])
+    _load_df(bq, "runs", pd.DataFrame([runs_row]))
     print(f"  ✓ {DATASET}.runs          1 row")
 
-    # ── mmm.diagnostics ───────────────────────────────────────────────────────
+    # ── mmm_results.diagnostics ───────────────────────────────────────────────
     rhat_by_ch = diagnostics.get("rhat_by_channel", {})
     ess_by_ch  = diagnostics.get("ess_by_channel", {})
     diag_rows = [
@@ -179,13 +194,12 @@ def write_run(client_id: str, run_id: str, outputs_dir: str | Path) -> None:
         for ch in rhat_by_ch
     ]
     if diag_rows:
-        _insert(bq, "diagnostics", diag_rows)
+        _load_df(bq, "diagnostics", pd.DataFrame(diag_rows))
         print(f"  ✓ {DATASET}.diagnostics   {len(diag_rows)} rows")
 
-    # ── mmm.contributions ─────────────────────────────────────────────────────
+    # ── mmm_results.contributions ─────────────────────────────────────────────
     contribs_df["run_id"]    = run_id
     contribs_df["client_id"] = client_id
-    # Replace NaN with None so BigQuery accepts nullable FLOAT fields
-    contribs_rows = contribs_df.where(pd.notnull(contribs_df), None).to_dict(orient="records")
-    _insert(bq, "contributions", contribs_rows)
-    print(f"  ✓ {DATASET}.contributions  {len(contribs_rows)} rows")
+    contribs_df["date"]      = pd.to_datetime(contribs_df["date"]).dt.date
+    _load_df(bq, "contributions", contribs_df)
+    print(f"  ✓ {DATASET}.contributions  {len(contribs_df)} rows")
