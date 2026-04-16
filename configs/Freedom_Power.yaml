@@ -1,0 +1,111 @@
+# configs/Freedom_Power.yaml
+# Drafted by config-builder agent — 2026-04-15
+# Client: Freedom Power — residential energy (solar/home services)
+# KPI: Gross_Leads (lead-gen; non-revenue model)
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+client_id: freedom_power
+
+# ── Data paths ────────────────────────────────────────────────────────────────
+data_path: data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/freedom_power/data.csv
+output_path: outputs/Freedom_Power/
+gcs_output_path: gs://mmm-pipeline-results/clients/freedom_power/runs/
+
+# ── Data structure ────────────────────────────────────────────────────────────
+date_column: date
+geo_column: geo
+kpi_column: Gross_Leads
+kpi_type: non_revenue  # lead-gen — Meridian uses non-revenue likelihood
+
+# ── Media channels (paid) ─────────────────────────────────────────────────────
+# Each name is the prefix for {name}_Cost and {name}_Impressions columns.
+# DVD = direct mail/video — confirmed in data; treated as paid impression channel.
+channels:
+  - Brand
+  - Non_Brand
+  - DVD
+  - Retargeting
+  - Prospecting
+
+# No earned/organic reach columns in this dataset.
+organic_channels: []
+
+# ── Controls ──────────────────────────────────────────────────────────────────
+# tax_credit_shift: IRA / policy-driven demand spikes (federal tax credit windows)
+# storm_date:       weather events that spike emergency energy inquiries
+controls:
+  - tax_credit_shift
+  - storm_date
+
+# ── Geo / population ──────────────────────────────────────────────────────────
+# Population is already a column in the CSV — no manual mapping needed.
+# The 6 geos below are the active markets after low-volume geos were removed.
+# Dropped geos (sparse / pilot): Carolinas, Denver, Virginia, Colorado Springs,
+#   Richmond, OOT — these do not appear in the current CSV.
+population_column: population
+geos_to_drop: []  # drops already applied in source CSV; update if raw data changes
+
+# ── Prior specification ───────────────────────────────────────────────────────
+# Using contribution priors (Beta mode) because:
+#   1. No channel-level ROAS holdout data exists for Freedom Power.
+#   2. KPI is a non-revenue conversion — harder to assign a $ ROAS prior.
+#   3. Industry benchmark: paid media drives ~55–65% of energy lead volume.
+# Contribution is split evenly across all 5 channels by the notebook.
+prior_type: contribution
+target_contribution: 0.60   # 60% of Gross_Leads attributed to paid channels (prior)
+prior_concentration: 50.0   # Beta concentration — moderate tightness; loosen to 20
+                             # if early diagnostics show prior dominance
+
+# ── Model spec ────────────────────────────────────────────────────────────────
+# knots: 'auto' resolves to n_weeks // 2 = 67 at runtime (134-week dataset).
+# 67 knots gives a flexible trend spline for a ~2.5-year series — appropriate here.
+knots: auto
+
+# max_lag = 4: digital-heavy channel mix (search, retargeting, prospecting).
+# DVD (direct mail / video) could warrant 6, but energy sector response is fast
+# (offers have expiry windows). Revisit after inspecting carryover diagnostics.
+max_lag: 4
+
+media_effects_dist: log_normal  # do not change
+
+# ── MCMC settings ─────────────────────────────────────────────────────────────
+mcmc:
+  dev:                  # fast iteration — single chain, minimal samples
+    n_chains: 1
+    n_adapt: 200
+    n_burnin: 200
+    n_keep: 200
+  prod:                 # full run on Colab — 4 chains for convergence diagnostics
+    n_chains: 4
+    n_adapt: 500
+    n_burnin: 500
+    n_keep: 500
+
+max_runtime_minutes: 45
+
+# ── Analyst review checklist ──────────────────────────────────────────────────
+# Before running, verify:
+#
+# [ ] target_contribution (0.60): confirm with client or industry benchmarks.
+#     Energy sector range is typically 0.50–0.70. Adjust if you have a spend-share
+#     estimate or prior attribution study.
+#
+# [ ] prior_concentration (50.0): check posterior vs. prior overlap after first
+#     dev run. If posteriors hug the prior, loosen to 20–30.
+#
+# [ ] max_lag (4): after first full run, inspect carryover curves. If DVD or Brand
+#     show heavy tail past week 4, bump to 6 and re-run.
+#
+# [ ] tax_credit_shift encoding: confirm this is a continuous variable (intensity
+#     score) not a binary flag. Binary flags don't need scaling; continuous do.
+#
+# [ ] storm_date encoding: same — confirm 0/1 binary vs. intensity score.
+#
+# [ ] geos_to_drop: if you pull a fresher CSV that includes Carolinas, Denver,
+#     Virginia, Colorado Springs, Richmond, OOT, add them back here so the
+#     pipeline filters them before model fit.
+#
+# [ ] DVD impressions: validate these are meaningful (not zero-inflated) before
+#     trusting the DVD effect estimate. Zero-heavy impression columns can cause
+#     degenerate posteriors.

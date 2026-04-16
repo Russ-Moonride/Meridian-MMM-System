@@ -1,0 +1,95 @@
+# configs/NorthSpore.yaml
+# Northspore — mushroom cultivation, multi-state US e-commerce
+# KPI: Revenue (revenue model)
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+client_id: northspore
+
+# ── Data paths ────────────────────────────────────────────────────────────────
+data_path: data/raw/northspore/NS_mmm_data_Mar26.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/northspore/data.csv
+output_path: outputs/northspore/
+gcs_output_path: gs://mmm-pipeline-results/clients/northspore/runs/
+
+# ── Data structure ────────────────────────────────────────────────────────────
+date_column: date
+geo_column: geo
+kpi_column: Revenue
+kpi_type: revenue
+
+# Date filter applied before gap-filling and feature engineering.
+# Drops the 8 weeks prior to March 2024 (sparse/ramp-up period).
+start_date: "2024-03-01"
+end_date: "2026-03-31"
+
+# ── Media channels (paid) ─────────────────────────────────────────────────────
+# Each name resolves to {name}_Cost and {name}_Impressions columns.
+# Note: CSV also contains Remarketing_* columns — those are a separate channel
+# not included in this model run (can be added as a future experiment).
+channels:
+  - Brand
+  - Non_Brand
+  - DVD
+  - Retargeting
+  - Prospecting
+  - Shopping
+  - Amazon
+
+# Organic channels: no spend counterpart. Columns are {name}_Views.
+organic_channels:
+  - Facebook
+  - Instagram
+  - YouTube
+
+# ── Controls ──────────────────────────────────────────────────────────────────
+# black_friday is computed from the date column — not a raw CSV column.
+# "Promo Intensity" and weekly_average_temp are in the CSV.
+# weekly_rainfall is in the CSV but excluded — showed no modelled effect in v1.
+controls:
+  - black_friday
+  - "Promo Intensity"
+  - weekly_average_temp
+
+# ── Geo / population ──────────────────────────────────────────────────────────
+# Population is a pre-populated column in the CSV (state-level).
+# 51 states + DC; no geos dropped — all markets are active.
+population_column: population
+geos_to_drop: []
+
+# ── Prior specification ───────────────────────────────────────────────────────
+# ROI priors use lognormal_dist_from_range(low, high, mass_percent=0.95).
+# Ranges represent the 95% credible interval for each channel's ROI.
+# Prospecting: wider/lower range reflects holdout evidence + seasonal uncertainty.
+prior_type: roi
+prior_roi_ranges:
+  Brand:       [1.3, 10.6]
+  Non_Brand:   [1.8,  7.7]
+  DVD:         [1.3, 12.3]
+  Retargeting: [1.3, 12.4]
+  Prospecting: [0.8,  6.0]   # holdout test showed low incremental lift
+  Shopping:    [2.0,  7.9]
+  Amazon:      [1.2,  4.9]
+prior_roi_mass_percent: 0.95
+
+# ── Model spec ────────────────────────────────────────────────────────────────
+# knots=26 is a deliberate choice (not auto / n_weeks//2=54).
+# 26 knots ≈ one every 4 weeks for a 2-year series — flexible but not overfit.
+knots: 26
+max_lag: 6
+adstock_decay_spec: geometric
+media_effects_dist: log_normal
+
+# ── MCMC settings ─────────────────────────────────────────────────────────────
+mcmc:
+  dev:
+    n_chains: 1
+    n_adapt: 200
+    n_burnin: 200
+    n_keep: 200
+  prod:
+    n_chains: 4
+    n_adapt: 500
+    n_burnin: 500
+    n_keep: 500
+
+max_runtime_minutes: 45
