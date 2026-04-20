@@ -19,6 +19,7 @@ Uses batch load jobs (load_table_from_dataframe) — works on all GCP tiers.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -162,7 +163,7 @@ def write_run(client_id: str, run_id: str, outputs_dir: str | Path) -> None:
     runs_row: dict[str, Any] = {
         "run_id":           run_id,
         "client_id":        client_id,
-        "completed_at":     diagnostics.get("completed_at"),
+        "completed_at":     pd.Timestamp(diagnostics.get("completed_at")),
         "status":           status.get("status", "complete"),
         "model_type":       diagnostics.get("model_type", "dev"),
         "n_weeks":          status.get("n_weeks"),
