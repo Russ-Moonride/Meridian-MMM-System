@@ -163,7 +163,7 @@ def write_run(client_id: str, run_id: str, outputs_dir: str | Path) -> None:
     runs_row: dict[str, Any] = {
         "run_id":           run_id,
         "client_id":        client_id,
-        "completed_at":     diagnostics.get("completed_at"),
+        "completed_at":     datetime.fromisoformat(diagnostics.get("completed_at")).replace(tzinfo=timezone.utc),
         "status":           status.get("status", "complete"),
         "model_type":       diagnostics.get("model_type", "dev"),
         "n_weeks":          status.get("n_weeks"),
@@ -178,9 +178,7 @@ def write_run(client_id: str, run_id: str, outputs_dir: str | Path) -> None:
         "converged":        diagnostics.get("converged"),
         "runtime_minutes":  diagnostics.get("runtime_minutes"),
     }
-    runs_df = pd.DataFrame([runs_row])
-    runs_df["completed_at"] = pd.to_datetime(runs_df["completed_at"], utc=True)
-    _load_df(bq, "runs", runs_df)
+    _load_df(bq, "runs", pd.DataFrame([runs_row]))
     print(f"  ✓ {DATASET}.runs          1 row")
 
     # ── mmm_results.diagnostics ───────────────────────────────────────────────
