@@ -80,7 +80,11 @@ def list_clients() -> list[dict[str, Any]]:
 
 
 def get_status(client_id: str) -> dict[str, Any]:
-    """Load status.json, or return a no-run placeholder."""
+    """Load run status — BigQuery first, local file fallback."""
+    if _has_bq_credentials():
+        result = get_status_bq(client_id)
+        if result is not None:
+            return result
     path = _output_dir(client_id) / "status.json"
     if path.exists():
         with open(path) as f:
@@ -171,7 +175,48 @@ def load_diagnostics_bq(client_id: str) -> dict | None:
 
 
 def _has_bq_credentials() -> bool:
-    return bool(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+    if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        return True
+    # Auto-detect service_account.json at repo root (gitignored, for local dev)
+    local_sa = REPO_ROOT / "service_account.json"
+    if local_sa.exists():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(local_sa)
+        return True
+    return False
+
+
+def get_status_bq(client_id: str) -> dict[str, Any] | None:
+    """Query mmm_results.runs for the most recent complete run for this client."""
+    try:
+        from google.cloud import bigquery
+        bq = bigquery.Client(project=_BQ_PROJECT)
+        query = f"""
+            SELECT run_id, status, completed_at, model_type,
+                   n_weeks, n_geos, n_channels
+            FROM `{_BQ_PROJECT}.{_BQ_DATASET}.runs`
+            WHERE client_id = @client_id
+            ORDER BY completed_at DESC
+            LIMIT 1
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ScalarQueryParameter("client_id", "STRING", client_id)]
+        )
+        rows = list(bq.query(query, job_config=job_config).result())
+        if not rows:
+            return None
+        row = dict(rows[0])
+        return {
+            "status":       row.get("status", "complete"),
+            "run_id":       row.get("run_id"),
+            "client_id":    client_id,
+            "completed_at": str(row.get("completed_at", "")),
+            "model_type":   row.get("model_type"),
+            "n_weeks":      row.get("n_weeks"),
+            "n_geos":       row.get("n_geos"),
+            "n_channels":   row.get("n_channels"),
+        }
+    except Exception:
+        return None
 
 
 def get_contributions(client_id: str) -> pd.DataFrame | None:
