@@ -5,6 +5,8 @@ __pycache__/
 *.nc
 *.pyc
 data/raw/
+data/processed/**
+!data/processed/.gitkeep
 outputs/
 .DS_Store
 service_account.json

@@ -138,6 +138,39 @@ Never commit data files or model outputs (see `.gitignore`).
 
 ---
 
+## New data source onboarding workflow
+
+When adding a new raw data source (e.g. Google Search Query volume, weather, promo calendars) to an existing client model, follow this sequence. Each step has a dedicated Claude Code agent.
+
+**Step-by-step:**
+1. Drop the raw file in `data/raw/{client_id}/`
+2. Run the **eda-analyst** agent with the file path and a description of what the data is
+3. Review the EDA report at `docs/eda/{filename}_report.md` — look at the "Analyst attention required" section and the data quality flags before proceeding
+4. Run the **data-transformer** agent with the raw file path, client ID, and source name
+5. Review the transform log at `docs/eda/{filename}_transform_log.md` — check the "Analyst Review Required" section for anything that required assumptions
+6. Run the **config-updater** agent with the client ID and source name
+7. Review the proposed config at `configs/{client_id}_proposed.yaml` and work through the Analyst Review Checklist
+8. When satisfied: `cp configs/{client_id}_proposed.yaml configs/{client_id}.yaml`
+9. Push to GitHub → trigger Colab run as normal
+
+**Agents (in `.claude/agents/`):**
+
+| Agent | File | Purpose |
+|---|---|---|
+| `eda-analyst` | `.claude/agents/eda-analyst.md` | Analyzes a raw data file and produces a quality report |
+| `data-transformer` | `.claude/agents/data-transformer.md` | Transforms raw data to pipeline-ready format with a full decision log |
+| `config-updater` | `.claude/agents/config-updater.md` | Proposes config changes for new data; writes to `_proposed.yaml` only |
+| `config-builder` | `.claude/agents/config-builder.md` | Drafts a full config for a new client from scratch |
+
+**Key directories for this workflow:**
+- `data/raw/{client_id}/` — drop raw files here (gitignored)
+- `data/processed/` — output from data-transformer (gitignored, `.gitkeep` keeps the dir)
+- `docs/eda/` — EDA reports and transform logs (committed — these are analyst artifacts)
+- `src/transforms/` — repeatable transformation scripts (committed)
+- `configs/{client_id}_proposed.yaml` — staging area for config changes (committed for review; rename to live when ready)
+
+---
+
 ## Colab execution
 
 `notebooks/colab_runner.ipynb` clones the repo, installs dependencies, mounts credentials from Google Drive, and executes `scripts/run_model.py` unchanged. It is the only sanctioned way to run production model jobs.
