@@ -2,7 +2,7 @@
 Transform: freedom_power / gsq (Google Search Query Volume)
 Input:  data/raw/Freedom_Power/Freedom-GQVdata-Mar26.csv
         data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv  (base frame)
-Output: data/processed/freedom_power_gsq.csv
+Output: data/processed/Freedom_Power/Freedom_MMM_data_Mar26_gqv.csv
 
 Decisions and assumptions: see docs/eda/freedom_power_gsq_transform_log.md
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 
 GQV_RAW   = Path("data/raw/Freedom_Power/Freedom-GQVdata-Mar26.csv")
 MMM_RAW   = Path("data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv")
-OUT_PATH  = Path("data/processed/freedom_power_gsq.csv")
+OUT_PATH  = Path("data/processed/Freedom_Power/Freedom_MMM_data_Mar26_gqv.csv")
 
 # Exact mapping: MMM geo names → GQV DMA GeoName strings
 GEO_MAP = {

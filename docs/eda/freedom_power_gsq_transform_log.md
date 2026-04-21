@@ -2,7 +2,8 @@
 **Script:** `src/transforms/freedom_power_gsq.py`
 **Input (GQV):** `data/raw/Freedom_Power/Freedom-GQVdata-Mar26.csv`
 **Input (base):** `data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv`
-**Output:** `data/processed/freedom_power_gsq.csv`
+**Output:** `data/processed/Freedom_Power/Freedom_MMM_data_Mar26_gqv.csv`
+
 **EDA report:** `docs/eda/Freedom-GQVdata-Mar26_report.md`
 **Date:** 2026-04-21
 

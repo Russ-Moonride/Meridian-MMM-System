@@ -387,6 +387,6 @@ The data-transformer agent will need to:
 
 1. **Decide on the 4 missing Apr 2026 weeks** — forward-fill or leave NaN? This is a judgment call before the transformer runs.
 2. **Decide controls vs. organic_channels** — Option A is recommended but Russ should sign off.
-3. **Run `data-transformer`** agent with source name `gsq` — it will produce `data/processed/freedom_power_gsq.csv` and the transformation script.
+3. **Run `data-transformer`** agent with source name `gsq` — it will produce `data/processed/Freedom_Power/Freedom_MMM_data_Mar26_gqv.csv` and the transformation script.
 4. **Run `config-updater`** agent — it will propose the updated `Freedom_Power_proposed.yaml` with `GQV_Brand` and `GQV_Generic` added.
 5. **Scale awareness** — after first dev run, check whether GQV_Brand's tiny scale (~0.0005) causes numerical issues. May need a multiplier (e.g., ×1000) to put it on a similar scale to GQV_Generic.
