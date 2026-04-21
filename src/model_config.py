@@ -70,7 +70,17 @@ def build_input_data(df: pd.DataFrame, config: dict[str, Any]):
 
 
 def build_priors(config: dict[str, Any]):
-    """Build a PriorDistribution from config roi_ranges."""
+    """Build a PriorDistribution from config.
+
+    ROI mode:          reads prior_roi_ranges per channel → LogNormal roi_m
+    Contribution mode: returns default PriorDistribution; Meridian handles
+                       the contribution fraction internally via media_prior_type.
+    """
+    prior_type = config.get("prior_type", "roi")
+
+    if prior_type == "contribution":
+        return prior_distribution.PriorDistribution()
+
     channels   = config["channels"]
     roi_ranges = config["prior_roi_ranges"]
     mass_pct   = config.get("prior_roi_mass_percent", 0.95)
@@ -92,13 +102,23 @@ def build_priors(config: dict[str, Any]):
     )
 
 
-def build_model_spec(config: dict[str, Any]):
-    """Build a ModelSpec from config."""
+def build_model_spec(config: dict[str, Any], n_weeks: int | None = None):
+    """Build a ModelSpec from config.
+
+    n_weeks is required when config['knots'] == 'auto'.
+    """
     priors = build_priors(config)
+
+    knots = config.get("knots", 26)
+    if str(knots).lower() == "auto":
+        if n_weeks is None:
+            raise ValueError("knots='auto' requires n_weeks to be passed to build_model_spec")
+        knots = n_weeks // 2
+
     return spec.ModelSpec(
         prior=priors,
         media_prior_type=config.get("prior_type", "roi"),
-        knots=config.get("knots", 26),
+        knots=knots,
         max_lag=config.get("max_lag", 6),
         adstock_decay_spec=config.get("adstock_decay_spec", "geometric"),
         media_effects_dist=config.get("media_effects_dist", "log_normal"),
@@ -108,5 +128,6 @@ def build_model_spec(config: dict[str, Any]):
 def build_model(df: pd.DataFrame, config: dict[str, Any]):
     """Assemble a Meridian model object (unfitted)."""
     input_data = build_input_data(df, config)
-    model_spec = build_model_spec(config)
+    n_weeks    = df[config["date_column"]].nunique()
+    model_spec = build_model_spec(config, n_weeks=n_weeks)
     return model.Meridian(input_data=input_data, model_spec=model_spec)
