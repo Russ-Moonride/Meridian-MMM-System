@@ -79,7 +79,15 @@ def build_priors(config: dict[str, Any]):
     prior_type = config.get("prior_type", "roi")
 
     if prior_type == "contribution":
-        return prior_distribution.PriorDistribution()
+        channels    = config["channels"]
+        target      = config.get("target_contribution", 0.60)
+        conc        = config.get("prior_concentration", 10.0)
+        per_ch_mean = target / len(channels)
+        alpha       = tf.cast(per_ch_mean * conc, tf.float32)
+        beta        = tf.cast((1.0 - per_ch_mean) * conc, tf.float32)
+        return prior_distribution.PriorDistribution(
+            contribution_m=tfd.Beta(alpha, beta)
+        )
 
     channels   = config["channels"]
     roi_ranges = config["prior_roi_ranges"]

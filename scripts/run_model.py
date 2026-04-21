@@ -85,7 +85,7 @@ def main() -> None:
         "n_keep":   mcmc_cfg.get("n_keep",   500 if mode == "prod" else 200),
     }
 
-    run_id  = f"{mode}_{datetime.now().strftime('%Y-%m-%d')}"
+    run_id  = f"{mode}_{datetime.now().strftime('%Y-%m-%d_%H%M')}"
     out_dir = REPO_ROOT / config.get("output_path", f"outputs/{client_id}")
 
     print(f"{'='*60}")
