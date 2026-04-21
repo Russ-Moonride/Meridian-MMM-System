@@ -93,19 +93,34 @@ def get_status(client_id: str) -> dict[str, Any]:
 
 
 def load_contributions_bq(client_id: str) -> pd.DataFrame | None:
-    """Query mmm.contributions for the most recent complete run for this client."""
+    """Query mmm.contributions for the most recent complete run for this client.
+
+    Prefers runs with status='complete' in the runs table; falls back to the
+    latest run_id found directly in contributions if the runs table has no
+    matching complete row (handles mismatched run_ids or non-'complete' status).
+    """
     try:
         from google.cloud import bigquery
         bq = bigquery.Client(project=_BQ_PROJECT)
         query = f"""
+            WITH latest_complete AS (
+              SELECT run_id FROM `{_BQ_PROJECT}.{_BQ_DATASET}.runs`
+              WHERE client_id = @client_id AND status = 'complete'
+              ORDER BY completed_at DESC
+              LIMIT 1
+            ),
+            latest_any AS (
+              SELECT run_id FROM `{_BQ_PROJECT}.{_BQ_DATASET}.contributions`
+              WHERE client_id = @client_id
+              ORDER BY run_id DESC
+              LIMIT 1
+            )
             SELECT c.*
             FROM `{_BQ_PROJECT}.{_BQ_DATASET}.contributions` c
             WHERE c.client_id = @client_id
-              AND c.run_id = (
-                SELECT run_id FROM `{_BQ_PROJECT}.{_BQ_DATASET}.runs`
-                WHERE client_id = @client_id AND status = 'complete'
-                ORDER BY completed_at DESC
-                LIMIT 1
+              AND c.run_id = COALESCE(
+                (SELECT run_id FROM latest_complete),
+                (SELECT run_id FROM latest_any)
               )
         """
         job_config = bigquery.QueryJobConfig(
