@@ -22,9 +22,9 @@ client_id: freedom_power
 # GQV_Generic joined in. The raw file (Freedom_MMM_data_Mar26.csv) is no longer
 # the modeling input — the processed file is a superset of it with 2 new columns.
 data_path: data/processed/Freedom_Power/Freedom_MMM_data_Mar26_gqv.csv   # ← was: data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/freedom_power/Freedom_MMM_data_Mar26_gqv.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/freedom/Freedom_MMM_data_Mar26_gqv.csv
 output_path: outputs/Freedom_Power/
-gcs_output_path: gs://mmm-pipeline-results/clients/freedom_power/runs/
+gcs_output_path: gs://mmm-pipeline-results/clients/freedom/runs/
 
 # ── Data structure ────────────────────────────────────────────────────────────
 date_column: date
