@@ -126,9 +126,10 @@ def load_contributions_bq(client_id: str) -> pd.DataFrame | None:
         job_config = bigquery.QueryJobConfig(
             query_parameters=[bigquery.ScalarQueryParameter("client_id", "STRING", client_id)]
         )
-        df = bq.query(query, job_config=job_config).to_dataframe()
-        if df.empty:
+        rows = list(bq.query(query, job_config=job_config).result())
+        if not rows:
             return None
+        df = pd.DataFrame([dict(r) for r in rows])
         df["date"] = pd.to_datetime(df["date"])
         return df
     except Exception:
