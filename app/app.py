@@ -65,7 +65,7 @@ navbar = dbc.Navbar(
                     dcc.Dropdown(
                         id="client-selector",
                         options=[],
-                        value=None,
+                        value="northspore",
                         clearable=False,
                         style={"width": "190px", "fontSize": "14px"},
                     ),
@@ -103,21 +103,18 @@ app.layout = html.Div(
 
 @app.callback(
     Output("client-selector", "options"),
-    Output("client-selector", "value"),
     Input("client-store", "data"),
 )
 def populate_client_dropdown(stored: str | None):
-    """Populate the navbar dropdown from all configured clients."""
+    """Populate the navbar dropdown options from all configured clients."""
     clients = app_data.list_clients()
-    options = [
+    return [
         {
             "label": c["client_id"].replace("_", " ").title(),
             "value": c["client_id"],
         }
         for c in clients
     ]
-    value = stored if stored else (options[0]["value"] if options else None)
-    return options, value
 
 
 @app.callback(
