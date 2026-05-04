@@ -10,3 +10,4 @@ data/processed/**
 outputs/
 .DS_Store
 service_account.json
+terminal_cheatsheet.md
