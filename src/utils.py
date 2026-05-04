@@ -10,6 +10,7 @@ extract_outputs(mmm, df, config, run_id, mcmc, out_dir) → dict
 from __future__ import annotations
 
 import json
+import pickle
 import time as _time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -178,6 +179,11 @@ def extract_outputs(
     contributions_df = pd.DataFrame(rows)
     contributions_df.to_csv(out_dir / "contributions.csv", index=False)
 
+    # ── Geo-level summary ─────────────────────────────────────────────────────
+    geo_metrics = m_analyzer.summary_metrics(aggregate_geos=False, use_kpi=True)
+    geo_df = geo_metrics.to_dataframe().reset_index()
+    geo_df.to_csv(out_dir / "geo_summary.csv", index=False)
+
     # ── diagnostics.json — rhat and ESS via arviz ─────────────────────────────
     diag_sum = az.summary(mmm.inference_data, var_names=["beta_m"], round_to=4)
 
@@ -229,6 +235,10 @@ def extract_outputs(
     }
     (out_dir / "status.json").write_text(json.dumps(status, indent=2))
 
+    # ── Model pickle ──────────────────────────────────────────────────────────
+    with open(out_dir / "model.pkl", "wb") as _fh:
+        pickle.dump(mmm, _fh)
+
     # ── Print summary ─────────────────────────────────────────────────────────
     paid_t    = contributions_df[contributions_df["channel_type"] == "paid"]["contribution"].sum()
     organic_t = contributions_df[contributions_df["channel_type"] == "organic"]["contribution"].sum()
@@ -236,8 +246,10 @@ def extract_outputs(
     grand     = paid_t + organic_t + base_t
 
     print(f"  contributions.csv   {len(contributions_df):,} rows  → {out_dir / 'contributions.csv'}")
+    print(f"  geo_summary.csv     {len(geo_df):,} rows  → {out_dir / 'geo_summary.csv'}")
     print(f"  diagnostics.json                     → {out_dir / 'diagnostics.json'}")
     print(f"  status.json                          → {out_dir / 'status.json'}")
+    print(f"  model.pkl                            → {out_dir / 'model.pkl'}")
     print(f"\n  Attribution split:")
     print(f"    Paid:     ${paid_t:>12,.0f}  ({paid_t / grand * 100:.1f}%)")
     print(f"    Organic:  ${organic_t:>12,.0f}  ({organic_t / grand * 100:.1f}%)")
@@ -247,6 +259,7 @@ def extract_outputs(
 
     return {
         "contributions_df": contributions_df,
+        "geo_df":           geo_df,
         "diagnostics":      diagnostics,
         "status":           status,
     }

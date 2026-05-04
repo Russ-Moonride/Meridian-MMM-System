@@ -36,6 +36,7 @@ from src.data_prep import load_config, prepare_data          # noqa: E402
 from src.model_config import build_model                     # noqa: E402
 from src.utils import extract_outputs                        # noqa: E402
 from src.bq_writer import write_run                          # noqa: E402
+from src.gcs_writer import upload_run_to_gcs                 # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,6 +140,21 @@ def main() -> None:
             write_run(client_id, run_id, out_dir)
         except Exception as exc:
             print(f"WARNING: BigQuery write failed: {exc}")
+            print("  Outputs are still on disk — run is otherwise complete.")
+
+    # ── GCS upload ────────────────────────────────────────────────────────────
+    gcs_output_path = config.get("gcs_output_path")
+    if not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        print("GCS upload skipped (GOOGLE_APPLICATION_CREDENTIALS not set).")
+    elif not gcs_output_path:
+        print("GCS upload skipped (gcs_output_path not set in config).")
+    else:
+        gcs_run_path = gcs_output_path.rstrip("/") + "/" + run_id
+        print(f"Uploading artifacts to GCS …\n  {gcs_run_path}/")
+        try:
+            upload_run_to_gcs(out_dir, gcs_run_path)
+        except Exception as exc:
+            print(f"WARNING: GCS upload failed: {exc}")
             print("  Outputs are still on disk — run is otherwise complete.")
 
     total_min = (time.time() - t_start) / 60
