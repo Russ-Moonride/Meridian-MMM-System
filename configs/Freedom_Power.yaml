@@ -10,7 +10,7 @@ client_id: freedom_power
 # Points to the processed Apr26 file which includes GQV columns and storm flags.
 # Raw source: data/raw/Freedom_Power/Freedom_MMM_data_Apr26.csv
 data_path: data/processed/Freedom_Power/Freedom_MMM_data_Apr26_gqv.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/freedom_power/data.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/freedom_power/Freedom_MMM_data_Apr26_gqv.csv
 output_path: outputs/Freedom_Power/
 gcs_output_path: gs://mmm-pipeline-results/clients/freedom_power/runs/
 
