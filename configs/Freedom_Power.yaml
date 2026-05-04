@@ -1,5 +1,5 @@
 # configs/Freedom_Power.yaml
-# Drafted by config-builder agent — 2026-04-15
+# Last updated: 2026-05-04 — synced from Freedom_Power_model.ipynb (Apr26 run)
 # Client: Freedom Power — residential energy (solar/home services)
 # KPI: Gross_Leads (lead-gen; non-revenue model)
 
@@ -7,7 +7,9 @@
 client_id: freedom_power
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-data_path: data/raw/Freedom_Power/Freedom_MMM_data_Mar26.csv
+# Points to the processed Apr26 file which includes GQV columns and storm flags.
+# Raw source: data/raw/Freedom_Power/Freedom_MMM_data_Apr26.csv
+data_path: data/processed/Freedom_Power/Freedom_MMM_data_Apr26_gqv.csv
 gcs_data_path: gs://mmm-pipeline-results/clients/freedom_power/data.csv
 output_path: outputs/Freedom_Power/
 gcs_output_path: gs://mmm-pipeline-results/clients/freedom_power/runs/
@@ -20,53 +22,90 @@ kpi_type: non_revenue  # lead-gen — Meridian uses non-revenue likelihood
 
 # ── Media channels (paid) ─────────────────────────────────────────────────────
 # Each name is the prefix for {name}_Cost and {name}_Impressions columns.
-# DVD = direct mail/video — confirmed in data; treated as paid impression channel.
+# Billboard added in Apr26 dataset — Austin only, 9 active weeks.
 channels:
-  - Brand
   - Non_Brand
+  - Brand
   - DVD
   - Retargeting
   - Prospecting
+  - Billboard
 
-# No earned/organic reach columns in this dataset.
-organic_channels: []
+# DirectMail_Impressions is in the data but has no spend column — organic channel.
+# Only 1 non-zero week in the Apr26 dataset — essentially unidentifiable.
+organic_channels:
+  - DirectMail
+organic_cols:             # overrides default {channel}_Views naming per channel
+  DirectMail: DirectMail_Impressions
 
 # ── Controls ──────────────────────────────────────────────────────────────────
-# tax_credit_shift: IRA / policy-driven demand spikes (federal tax credit windows)
-# storm_date:       weather events that spike emergency energy inquiries
+# storm_acute / storm_tail: weather event binary flags (pre-built in processed CSV)
+# GQV_Brand / GQV_Generic: Google Query Volume for branded and generic energy search terms
+# tax_credit_shift: IRA / policy-driven demand spike (binary flag: 1 from 2025-10-01)
 controls:
   - tax_credit_shift
-  - storm_date
+  - storm_acute
+  - storm_tail
+  - GQV_Brand
+  - GQV_Generic
 
 # ── Geo / population ──────────────────────────────────────────────────────────
-# Population is already a column in the CSV — no manual mapping needed.
-# The 6 geos below are the active markets after low-volume geos were removed.
+# Active markets after low-volume geos were dropped.
 # Dropped geos (sparse / pilot): Carolinas, Denver, Virginia, Colorado Springs,
-#   Richmond, OOT — these do not appear in the current CSV.
+#   Richmond, OOT — not present in source CSV.
 population_column: population
 geos_to_drop: []  # drops already applied in source CSV; update if raw data changes
 
+# Active geo population mapping (DMA estimates):
+#   DFW: 3,264,490 | Houston: 2,797,420 | Tampa: 2,221,240
+#   Orlando: 1,902,420 | San Antonio: 1,096,400 | Austin: 1,029,800
+
 # ── Prior specification ───────────────────────────────────────────────────────
-# Using contribution priors (Beta mode) because:
-#   1. No channel-level ROAS holdout data exists for Freedom Power.
-#   2. KPI is a non-revenue conversion — harder to assign a $ ROAS prior.
-#   3. Industry benchmark: paid media drives ~55–65% of energy lead volume.
-# Contribution is split evenly across all 5 channels by the notebook.
+# Using per-channel contribution priors (Beta mode).
+# Rationale: no channel-level ROAS holdout exists; KPI is a non-revenue conversion.
+# Shares derived from prior model run (Mar26); total paid-media target = 60% of leads.
+#
+# Scale factor = 0.60 / sum(shares) ≈ 0.622 — applied to convert media shares to
+# fraction-of-total-KPI targets expected by Meridian's Beta prior.
+#
+# Billboard: low share (1%) reflects ~10% contribution in its active Austin window
+# diluted across 122 weeks × 6 geos; looser concentration (12) allows more movement
+# given sparse data.
 prior_type: contribution
-target_contribution: 0.60   # 60% of Gross_Leads attributed to paid channels (prior)
-prior_concentration: 50.0   # Beta concentration — moderate tightness; loosen to 20
-                             # if early diagnostics show prior dominance
+total_media_contribution: 0.60   # 60% of Gross_Leads attributed to paid channels
+concentration_default: 20.0      # medium tightness for all channels except Billboard
+concentration_billboard: 12.0    # looser — Billboard has sparse / partial data
+
+channel_media_shares:            # each channel's share of total paid-media contribution
+  Prospecting:  0.26
+  Non_Brand:    0.25
+  Retargeting:  0.22
+  Brand:        0.17
+  DVD:          0.055
+  Billboard:    0.01
+
+# Derived prior means (fraction of total KPI) — for reference:
+#   Prospecting:  16.2%  | Non_Brand: 15.5% | Retargeting: 13.7%
+#   Brand:        10.6%  | DVD:        3.4% | Billboard:    0.6%
+#   Baseline (implicit): ~40%
+
+# Organic channel prior — contribution_o
+# DirectMail: 0.5% of total KPI; concentration=8 (very loose — only 1 non-zero week).
+# Posterior will likely collapse toward zero given no data signal.
+organic_contribution_prior:
+  DirectMail:
+    mu: 0.005
+    concentration: 8.0
 
 # ── Model spec ────────────────────────────────────────────────────────────────
-# knots: 'auto' resolves to n_weeks // 2 = 67 at runtime (134-week dataset).
-# 67 knots gives a flexible trend spline for a ~2.5-year series — appropriate here.
+# knots: 'auto' resolves to n_weeks // 2 at runtime (~61 knots for Apr26 dataset).
 knots: auto
 
 # max_lag = 4: digital-heavy channel mix (search, retargeting, prospecting).
-# DVD (direct mail / video) could warrant 6, but energy sector response is fast
-# (offers have expiry windows). Revisit after inspecting carryover diagnostics.
+# DVD (direct mail / video) could warrant 6 but energy sector response is fast.
 max_lag: 4
 
+media_prior_type: contribution
 media_effects_dist: log_normal  # do not change
 
 # ── MCMC settings ─────────────────────────────────────────────────────────────
@@ -87,25 +126,27 @@ max_runtime_minutes: 45
 # ── Analyst review checklist ──────────────────────────────────────────────────
 # Before running, verify:
 #
-# [ ] target_contribution (0.60): confirm with client or industry benchmarks.
-#     Energy sector range is typically 0.50–0.70. Adjust if you have a spend-share
-#     estimate or prior attribution study.
+# [ ] channel_media_shares: these are from the Mar26 model run — validate they still
+#     look reasonable after inspecting Apr26 posteriors.
 #
-# [ ] prior_concentration (50.0): check posterior vs. prior overlap after first
-#     dev run. If posteriors hug the prior, loosen to 20–30.
+# [ ] total_media_contribution (0.60): confirms with industry benchmarks (50–70%).
+#     Adjust if Apr26 posterior shifts significantly.
+#
+# [ ] concentration_default (20.0): check posterior vs. prior overlap after first
+#     dev run. If posteriors hug the prior, loosen to 10–15.
+#
+# [ ] concentration_billboard (12.0): Billboard is Austin-only, 9 active weeks.
+#     Inspect posterior carefully — sparse data may cause weak identification.
 #
 # [ ] max_lag (4): after first full run, inspect carryover curves. If DVD or Brand
 #     show heavy tail past week 4, bump to 6 and re-run.
 #
-# [ ] tax_credit_shift encoding: confirm this is a continuous variable (intensity
-#     score) not a binary flag. Binary flags don't need scaling; continuous do.
+# [ ] GQV controls: confirm GQV_Brand and GQV_Generic are scaled appropriately
+#     in the processed CSV (check data-transformer output / EDA report).
 #
-# [ ] storm_date encoding: same — confirm 0/1 binary vs. intensity score.
+# [ ] tax_credit_shift: binary 0/1 flag (1 from 2025-10-01 onward) — no scaling needed.
 #
-# [ ] geos_to_drop: if you pull a fresher CSV that includes Carolinas, Denver,
-#     Virginia, Colorado Springs, Richmond, OOT, add them back here so the
-#     pipeline filters them before model fit.
+# [ ] storm_acute / storm_tail: confirm binary 0/1 flags in processed CSV.
 #
-# [ ] DVD impressions: validate these are meaningful (not zero-inflated) before
-#     trusting the DVD effect estimate. Zero-heavy impression columns can cause
-#     degenerate posteriors.
+# [ ] geos_to_drop: if fresher CSV includes Carolinas, Denver, Virginia, Colorado
+#     Springs, Richmond, OOT — add them here so the pipeline filters before model fit.

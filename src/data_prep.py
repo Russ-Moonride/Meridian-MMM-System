@@ -154,8 +154,10 @@ def prepare_data(config: dict[str, Any]) -> pd.DataFrame:
         df[f"{ch}_Cost"]        = df[f"{ch}_Cost"].astype(np.float32)
         df[f"{ch}_Impressions"] = df[f"{ch}_Impressions"].astype(np.float32)
 
+    organic_col_map = config.get("organic_cols", {})
     for ch in organic_chs:
-        df[f"{ch}_Views"] = df[f"{ch}_Views"].astype(np.float32)
+        col = organic_col_map.get(ch, f"{ch}_Views")
+        df[col] = df[col].astype(np.float32)
 
     if pop_col in df.columns:
         df[pop_col] = df[pop_col].astype(np.float32)
@@ -223,11 +225,12 @@ def _validate(df: pd.DataFrame, config: dict[str, Any]) -> None:
     pop_col   = config.get("population_column", "population")
 
     # Required columns must exist
+    organic_col_map = config.get("organic_cols", {})
     required = (
         [date_col, geo_col, kpi_col]
         + [f"{c}_Cost"        for c in channels]
         + [f"{c}_Impressions" for c in channels]
-        + [f"{c}_Views"       for c in organic]
+        + [organic_col_map.get(c, f"{c}_Views") for c in organic]
     )
     missing = [c for c in required if c not in df.columns]
     if missing:

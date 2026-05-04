@@ -49,9 +49,10 @@ def build_input_data(df: pd.DataFrame, config: dict[str, Any]):
         geo_col=geo_col,
     )
     if organic_chs:
+        organic_col_map = config.get("organic_cols", {})
         builder = builder.with_organic_media(
             df,
-            organic_media_cols=[f"{c}_Views" for c in organic_chs],
+            organic_media_cols=[organic_col_map.get(c, f"{c}_Views") for c in organic_chs],
             organic_media_channels=organic_chs,
             media_time_col=date_col,
             geo_col=geo_col,
@@ -73,21 +74,54 @@ def build_priors(config: dict[str, Any]):
     """Build a PriorDistribution from config.
 
     ROI mode:          reads prior_roi_ranges per channel → LogNormal roi_m
-    Contribution mode: returns default PriorDistribution; Meridian handles
-                       the contribution fraction internally via media_prior_type.
+    Contribution mode: reads channel_media_shares + concentration settings
+                       for per-channel Beta priors; also builds contribution_o
+                       for organic channels if organic_contribution_prior is set.
     """
     prior_type = config.get("prior_type", "roi")
 
     if prior_type == "contribution":
         channels    = config["channels"]
-        target      = config.get("target_contribution", 0.60)
-        conc        = config.get("prior_concentration", 10.0)
-        per_ch_mean = target / len(channels)
-        alpha       = tf.cast(per_ch_mean * conc, tf.float32)
-        beta        = tf.cast((1.0 - per_ch_mean) * conc, tf.float32)
-        return prior_distribution.PriorDistribution(
-            contribution_m=tfd.Beta(alpha, beta)
-        )
+        total       = config.get("total_media_contribution", config.get("target_contribution", 0.60))
+        conc_def    = config.get("concentration_default", config.get("prior_concentration", 10.0))
+        shares      = config.get("channel_media_shares", {})
+
+        if shares:
+            scale   = total / sum(shares.values())
+            targets = {ch: shares.get(ch, total / len(channels)) * scale for ch in channels}
+        else:
+            targets = {ch: total / len(channels) for ch in channels}
+
+        a_params, b_params = [], []
+        for ch in channels:
+            mu   = targets[ch]
+            conc = config.get(f"concentration_{ch.lower()}", conc_def)
+            a_params.append(mu * conc)
+            b_params.append((1.0 - mu) * conc)
+
+        prior_kwargs: dict[str, Any] = {
+            "contribution_m": tfd.Beta(
+                concentration1=tf.cast(a_params, tf.float32),
+                concentration0=tf.cast(b_params, tf.float32),
+            )
+        }
+
+        organic_prior_cfg = config.get("organic_contribution_prior", {})
+        organic_chs = config.get("organic_channels", [])
+        if organic_prior_cfg and organic_chs:
+            o_a, o_b = [], []
+            for ch in organic_chs:
+                ch_cfg = organic_prior_cfg.get(ch, {})
+                mu   = ch_cfg.get("mu", 0.005)
+                conc = ch_cfg.get("concentration", 8.0)
+                o_a.append(mu * conc)
+                o_b.append((1.0 - mu) * conc)
+            prior_kwargs["contribution_om"] = tfd.Beta(
+                concentration1=tf.cast(o_a, tf.float32),
+                concentration0=tf.cast(o_b, tf.float32),
+            )
+
+        return prior_distribution.PriorDistribution(**prior_kwargs)
 
     channels   = config["channels"]
     roi_ranges = config["prior_roi_ranges"]
@@ -125,7 +159,7 @@ def build_model_spec(config: dict[str, Any], n_weeks: int | None = None):
 
     return spec.ModelSpec(
         prior=priors,
-        media_prior_type=config.get("prior_type", "roi"),
+        media_prior_type=config.get("media_prior_type", config.get("prior_type", "roi")),
         knots=knots,
         max_lag=config.get("max_lag", 6),
         adstock_decay_spec=config.get("adstock_decay_spec", "geometric"),
