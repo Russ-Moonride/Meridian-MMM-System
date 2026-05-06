@@ -116,10 +116,10 @@ concentration_reddit: 10.0       # loosest — Reddit has 8 active weeks, 5 of 6
 channel_media_shares:            # each channel's share of total paid-media contribution
   Prospecting:  0.26
   Non_Brand:    0.25
-  Retargeting:  0.22
+  Retargeting:  0.21
   Brand:        0.17
   DVD:          0.055
-  Billboard:    0.01
+  Billboard:    0.02
   Reddit:       0.005  # NEW — 0.5% share; half of Billboard; reflects sparse coverage
 
 # Derived prior means (fraction of total KPI) — for reference:
