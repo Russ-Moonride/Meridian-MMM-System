@@ -1,7 +1,29 @@
-# configs/Freedom_Power.yaml
-# Last updated: 2026-05-04 — synced from Freedom_Power_model.ipynb (Apr26 run)
-# Client: Freedom Power — residential energy (solar/home services)
-# KPI: Gross_Leads (lead-gen; non-revenue model)
+# configs/Freedom_Power_proposed.yaml
+# Proposed config — freedom_power
+# Generated: 2026-05-06
+# Base config: configs/Freedom_Power.yaml (last updated 2026-05-04)
+#
+# Changes from live config:
+#   1. Added `Reddit` to the `channels` list (appended after Billboard)
+#   2. Added `Reddit: 0.005` to `channel_media_shares`
+#      — half of Billboard's 0.01 share, reflecting thinner data coverage
+#        (8 active weeks vs. Billboard's 9–10; San Antonio never activated)
+#   3. Added `concentration_reddit: 10.0` — looser than default (20) and
+#      Billboard (12) to allow more posterior movement given only 8 active weeks
+#   4. Updated `derived prior means` comment block to include Reddit
+#   5. Added Reddit-specific items to the Analyst Review Checklist
+#   6. data_path unchanged — already points to the correct processed file
+#
+# NOTE: program.md does not exist at the repo root. Prior archetype defaults
+#   from the config-builder archetype table were used where applicable.
+#
+# Prior archetype note:
+#   Reddit is a paid social platform. Under an ROI framework it would be
+#   classified as Prospecting / paid social (mean 1.0–2.0, scale 1.0).
+#   However this config uses prior_type: contribution (Beta mode) throughout,
+#   so no ROI mean/scale is assigned. Instead, Reddit receives a share of
+#   total_media_contribution via channel_media_shares, with a looser
+#   concentration to express the higher parameter uncertainty.
 
 # ── Identity ──────────────────────────────────────────────────────────────────
 client_id: freedom_power
@@ -9,6 +31,8 @@ client_id: freedom_power
 # ── Data paths ────────────────────────────────────────────────────────────────
 # Points to the processed Apr26 file which includes GQV columns and storm flags.
 # Raw source: data/raw/Freedom_Power/Freedom_MMM_data_Apr26.csv
+# Reddit_Cost and Reddit_Impressions are present in this processed file —
+# no data_path change is required.
 data_path: data/processed/Freedom_Power/Freedom_MMM_data_Apr26_gqv.csv
 gcs_data_path: gs://mmm-pipeline-results/clients/freedom/Freedom_MMM_data_Apr26_gqv.csv
 output_path: outputs/Freedom/
@@ -23,6 +47,8 @@ kpi_type: non_revenue  # lead-gen — Meridian uses non-revenue likelihood
 # ── Media channels (paid) ─────────────────────────────────────────────────────
 # Each name is the prefix for {name}_Cost and {name}_Impressions columns.
 # Billboard added in Apr26 dataset — Austin only, 9 active weeks.
+# Reddit added in Apr26 dataset — 5 of 6 geos, 8 active weeks from 2026-03-16.
+# San Antonio has zero Reddit spend for the full 123-week history (see checklist).
 channels:
   - Non_Brand
   - Brand
@@ -30,6 +56,7 @@ channels:
   - Retargeting
   - Prospecting
   - Billboard
+  - Reddit  # NEW — paid social channel; 8 active weeks; ~94% zeros across full history
 
 # DirectMail_Impressions is in the data but has no spend column — organic channel.
 # Only 1 non-zero week in the Apr26 dataset — essentially unidentifiable.
@@ -65,16 +92,26 @@ geos_to_drop: []  # drops already applied in source CSV; update if raw data chan
 # Rationale: no channel-level ROAS holdout exists; KPI is a non-revenue conversion.
 # Shares derived from prior model run (Mar26); total paid-media target = 60% of leads.
 #
-# Scale factor = 0.60 / sum(shares) ≈ 0.622 — applied to convert media shares to
+# Scale factor = 0.60 / sum(shares) ≈ 0.619 — applied to convert media shares to
 # fraction-of-total-KPI targets expected by Meridian's Beta prior.
+# (Scale factor shifted from 0.622 → 0.619 with Reddit added; effect on all other
+# derived means is <0.1 pp — no rebalancing of existing shares is warranted.)
 #
 # Billboard: low share (1%) reflects ~10% contribution in its active Austin window
 # diluted across 122 weeks × 6 geos; looser concentration (12) allows more movement
 # given sparse data.
+#
+# Reddit: share of 0.5% — half of Billboard's 1%, reflecting:
+#   (a) 8 active weeks vs. Billboard's 9–10 active weeks
+#   (b) 5 of 6 geos active (San Antonio permanently zeroed)
+#   (c) extremely zero-inflated history (~94% zeros across full 123-week frame)
+#   Loosest concentration in the model (10) to allow the posterior maximum freedom
+#   given near-total data sparsity. Analyst explicitly requested very small prior.
 prior_type: contribution
 total_media_contribution: 0.60   # 60% of Gross_Leads attributed to paid channels
-concentration_default: 20.0      # medium tightness for all channels except Billboard
-concentration_billboard: 12.0    # looser — Billboard has sparse / partial data
+concentration_default: 20.0      # medium tightness for all channels except Billboard and Reddit
+concentration_billboard: 12.0    # looser — Billboard has sparse / partial data (Austin only, 9–10 weeks)
+concentration_reddit: 10.0       # loosest — Reddit has 8 active weeks, 5 of 6 geos, ~94% zeros
 
 channel_media_shares:            # each channel's share of total paid-media contribution
   Prospecting:  0.26
@@ -83,11 +120,18 @@ channel_media_shares:            # each channel's share of total paid-media cont
   Brand:        0.17
   DVD:          0.055
   Billboard:    0.01
+  Reddit:       0.005  # NEW — 0.5% share; half of Billboard; reflects sparse coverage
 
 # Derived prior means (fraction of total KPI) — for reference:
-#   Prospecting:  16.2%  | Non_Brand: 15.5% | Retargeting: 13.7%
-#   Brand:        10.6%  | DVD:        3.4% | Billboard:    0.6%
+#   scale_factor = 0.60 / 0.970 = 0.6186
+#   Prospecting:  16.1%  | Non_Brand: 15.5% | Retargeting: 13.6%
+#   Brand:        10.5%  | DVD:        3.4% | Billboard:    0.6%
+#   Reddit:        0.3%  (NEW)
 #   Baseline (implicit): ~40%
+#
+# Note: existing channel derived means shifted by <0.1 pp vs. live config
+# (Prospecting 16.2% → 16.1%, Non_Brand 15.5% unchanged, etc.) due to
+# denominator growing from 0.960 to 0.970. Not material; no rebalancing needed.
 
 # Organic channel prior — contribution_o
 # DirectMail: 0.5% of total KPI; concentration=8 (very loose — only 1 non-zero week).
@@ -102,6 +146,8 @@ organic_contribution_prior:
 knots: auto
 
 # max_lag = 4: digital-heavy channel mix (search, retargeting, prospecting).
+# Reddit is a paid social platform — typical response window is 1–2 weeks, well
+# within the current max_lag of 4. No change to max_lag is needed.
 # DVD (direct mail / video) could warrant 6 but energy sector response is fast.
 max_lag: 4
 
@@ -125,6 +171,8 @@ max_runtime_minutes: 45
 
 # ── Analyst review checklist ──────────────────────────────────────────────────
 # Before running, verify:
+#
+# EXISTING ITEMS (carried through from live config):
 #
 # [ ] channel_media_shares: these are from the Mar26 model run — validate they still
 #     look reasonable after inspecting Apr26 posteriors.
@@ -150,3 +198,48 @@ max_runtime_minutes: 45
 #
 # [ ] geos_to_drop: if fresher CSV includes Carolinas, Denver, Virginia, Colorado
 #     Springs, Richmond, OOT — add them here so the pipeline filters before model fit.
+#
+# NEW ITEMS — REDDIT:
+#
+# [ ] Reddit identification risk: with only 8 active weeks of data and ~94% zeros,
+#     Meridian has very limited signal to estimate Reddit's contribution independently.
+#     After the first dev run, check whether the Reddit posterior is meaningfully
+#     different from the prior. If the posterior closely matches the prior (prior
+#     concentration=10, mu=0.003 derived), Reddit is not identified by the data.
+#     In that case, consider: (a) holding Reddit out of this run entirely and
+#     re-evaluating after 3–6 more months of data, or (b) including it with this
+#     small prior as a placeholder for continuity. Analyst must decide.
+#
+# [ ] concentration_reddit (10.0): this is the loosest concentration in the model,
+#     chosen to give the posterior maximum freedom given sparse data. After the dev
+#     run, compare posterior distribution to the prior. If the posterior is narrower
+#     than the prior and peaks at a plausible value, Reddit may be weakly identified.
+#     If the posterior is nearly identical to the prior, the channel is not identified.
+#
+# [ ] Reddit share (0.005): this is a judgment call anchored to Billboard's share
+#     (0.01) and halved to reflect thinner coverage. There is no model-run evidence
+#     for Reddit yet (it is a new channel). Revisit this share after the first full
+#     run once posterior estimates are available.
+#
+# [ ] San Antonio Reddit zeroing: the transform log confirms that 2 rows
+#     (2026-03-16 and 2026-03-23) had Reddit_Impressions > 0 with Reddit_Cost = $0
+#     and were zeroed out. San Antonio therefore has zero Reddit signal for all
+#     123 weeks. Confirm with the media team that no Reddit spend was placed in
+#     San Antonio — if organic/earned Reddit impressions should be modeled, a
+#     different treatment (e.g. a separate organic signal) would be needed.
+#
+# [ ] Reddit column names in processed CSV: confirmed as `Reddit_Cost` and
+#     `Reddit_Impressions` (verified from data/processed/Freedom_Power/
+#     Freedom_MMM_data_Apr26_gqv.csv column inventory). The channel prefix `Reddit`
+#     resolves correctly to these columns.
+#
+# [ ] Prospecting spike (Tampa and Orlando, 2026-04): values exceed mean + 3*std
+#     during 2026-04-06 through 2026-04-27. EDA flagged this as a genuine budget
+#     ramp-up. Confirm with client before using this data for optimization
+#     recommendations — if the April values were anomalous rather than intentional,
+#     they could inflate the Prospecting contribution estimate.
+#
+# [ ] Billboard flat value: Austin Billboard_Cost = $32,900 and
+#     Billboard_Impressions = 845,515 exactly for all 10 consecutive active weeks
+#     (2026-03-02 through 2026-05-04). Confirm with client whether this is a
+#     fixed-rate OOH contract or whether weekly actuals are available.

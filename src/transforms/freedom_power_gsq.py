@@ -4,9 +4,12 @@ Input:  data/raw/Freedom_Power/Freedom-GQVdata-Mar26.csv
         data/raw/Freedom_Power/Freedom_MMM_data_Apr26.csv  (base frame)
 Output: data/processed/Freedom_Power/Freedom_MMM_data_Apr26_gqv.csv
 
-Missing GQV weeks (2026-04-06 → 2026-04-27) are estimated via YoY adjustment:
+Missing GQV weeks (2026-04-06 → 2026-05-04) are estimated via YoY adjustment:
   estimate[geo, label, week] = gqv[geo, label, same_week_2025] × ratio_Q1[geo, label]
 where ratio_Q1 = mean(Q1-2026) / mean(Q1-2025) per geo × label.
+
+San Antonio fix: Reddit_Impressions zeroed where Reddit_Cost == 0 (data artifact,
+weeks 2026-03-16 and 2026-03-23).
 
 Decisions and assumptions: see docs/eda/freedom_power_gsq_transform_log.md
 """
@@ -29,12 +32,13 @@ GEO_MAP = {
 REVERSE_GEO = {v: k for k, v in GEO_MAP.items()}
 MODEL_GQV_GEOS = list(GEO_MAP.values())
 
-# Missing 2026 week → matching 2025 week (same position in April)
+# Missing 2026 weeks → matching 2025 weeks (same calendar position)
 WEEK_MAP_2026_TO_2025 = {
     pd.Timestamp("2026-04-06"): pd.Timestamp("2025-04-07"),
     pd.Timestamp("2026-04-13"): pd.Timestamp("2025-04-14"),
     pd.Timestamp("2026-04-20"): pd.Timestamp("2025-04-21"),
     pd.Timestamp("2026-04-27"): pd.Timestamp("2025-04-28"),
+    pd.Timestamp("2026-05-04"): pd.Timestamp("2025-05-05"),  # added 2026-05-06: Apr26 data extension
 }
 
 
@@ -125,6 +129,18 @@ def main():
     print(f"[MMM base]  {mmm_rows:,} rows  |  "
           f"{mmm['date'].min().date()} → {mmm['date'].max().date()}  |  "
           f"geos: {sorted(mmm['geo'].unique())}")
+
+    # San Antonio fix: zero out Reddit_Impressions where Reddit_Cost == 0 in San Antonio.
+    # 2026-03-16 and 2026-03-23 show Reddit_Impressions > 0 with $0 spend — treated as a
+    # data artifact (impressions logged against the wrong geo; no spend was actually placed).
+    if "Reddit_Impressions" in mmm.columns:
+        sa_anomaly_mask = (mmm["geo"] == "San Antonio") & (mmm["Reddit_Cost"] == 0) & (mmm["Reddit_Impressions"] > 0)
+        n_zeroed = sa_anomaly_mask.sum()
+        if n_zeroed > 0:
+            anomaly_dates = mmm.loc[sa_anomaly_mask, "date"].dt.date.tolist()
+            mmm.loc[sa_anomaly_mask, "Reddit_Impressions"] = 0.0
+            print(f"[SA fix]  Zeroed Reddit_Impressions for {n_zeroed} San Antonio rows "
+                  f"(Reddit_Cost=0 but Impressions>0): {anomaly_dates}")
 
     gqv_raw = load_and_filter_gqv(GQV_RAW)
 
