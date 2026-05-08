@@ -33,7 +33,6 @@ channels:
   - Retargeting
   - Prospecting
   - Shopping
-  - Amazon
 
 # Organic channels: no spend counterpart. Columns are {name}_Views.
 organic_channels:
