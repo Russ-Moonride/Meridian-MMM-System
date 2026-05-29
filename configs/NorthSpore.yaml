@@ -6,8 +6,8 @@
 client_id: northspore
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-data_path: data/raw/northspore/NS_mmm_data_Apr26.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/northspore/NS_mmm_data_Apr26.csv
+data_path: data/processed/northspore/NS_mmm_data_May26.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/northspore/NS_mmm_data_May26.csv
 output_path: outputs/northspore/
 gcs_output_path: gs://mmm-pipeline-results/clients/northspore/runs/
 
@@ -34,6 +34,7 @@ channels:
   - Prospecting
   - Shopping
   - Pmax
+  - TikTok
 
 # Organic channels: no spend counterpart. Columns are {name}_Views.
 organic_channels:
@@ -69,6 +70,7 @@ prior_roi_ranges:
   Prospecting: [0.8,  6.0]   # holdout test showed low incremental lift
   Shopping:    [2.0,  7.9]
   Pmax:        [1.0,  6.0]   # Performance Max — weakly informative prior, first run
+  TikTok:      [2.0,  4.5]   # tight prior — sporadic spend; anchors impact at plausible social ROI rather than near-zero
 prior_roi_mass_percent: 0.95
 
 # ── Model spec ────────────────────────────────────────────────────────────────
