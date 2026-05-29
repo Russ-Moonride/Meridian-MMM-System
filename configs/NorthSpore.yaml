@@ -6,8 +6,8 @@
 client_id: northspore
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-data_path: data/processed/northspore/NS_mmm_data_May26.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/northspore/NS_mmm_data_May26.csv
+data_path: data/processed/northspore/NS_mmm_data_Apr26.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/northspore/NS_mmm_data_Apr26.csv
 output_path: outputs/northspore/
 gcs_output_path: gs://mmm-pipeline-results/clients/northspore/runs/
 

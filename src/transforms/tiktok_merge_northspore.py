@@ -6,7 +6,7 @@ Sources:
   data/raw/northspore/Tiktok Ads_Untitled report_North Spore_20260101-20260529.xlsx
 
 Output:
-  data/processed/northspore/NS_mmm_data_May26.csv
+  data/processed/northspore/NS_mmm_data_Apr26.csv
 
 Key transforms:
   1. Parse both Excel files, combine
@@ -161,7 +161,7 @@ def main():
     print(f"  Weeks with any TikTok spend:")
     print(nonzero_weeks[nonzero_weeks > 0].to_string())
 
-    out_path = OUT / "NS_mmm_data_May26.csv"
+    out_path = OUT / "NS_mmm_data_Apr26.csv"
     final.to_csv(out_path, index=False)
     print(f"\nSaved to: {out_path}")
 
