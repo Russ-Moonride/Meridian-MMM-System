@@ -54,6 +54,7 @@ navbar = dbc.Navbar(
                     _nav_link("Clients", "/"),
                     _nav_link("Results", "/results"),
                     _nav_link("Diagnostics", "/diagnostics"),
+                    _nav_link("Attribution", "/attribution"),
                     _nav_link("Config", "/config"),
                 ],
                 navbar=True,

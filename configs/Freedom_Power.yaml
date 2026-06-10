@@ -243,3 +243,17 @@ max_runtime_minutes: 45
 #     Billboard_Impressions = 845,515 exactly for all 10 consecutive active weeks
 #     (2026-03-02 through 2026-05-04). Confirm with client whether this is a
 #     fixed-rate OOH contract or whether weekly actuals are available.
+
+# ── Last-touch attribution (triangulation) ────────────────────────────────────
+# BQ source tables for last-touch leads and spend, used in the attribution page.
+# channel_map translates raw BQ Type values to MMM channel names.
+# Billboard, Reddit, DirectMail have no last-touch counterpart and are excluded.
+last_touch:
+  bq_project: freedom-solar-406415
+  excluded_geos: [Carolinas, Denver, Virginia, Colorado Springs, Richmond, OOT, Other]
+  channel_map:
+    Brand: Brand
+    Non-Brand: Non_Brand
+    DVD: DVD
+    Retargeting: Retargeting
+    Prospecting: Prospecting

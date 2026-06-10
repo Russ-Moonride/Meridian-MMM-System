@@ -235,6 +235,102 @@ def get_status_bq(client_id: str) -> dict[str, Any] | None:
         return None
 
 
+def load_last_touch_bq(client_id: str) -> pd.DataFrame | None:
+    """Query Freedom Solar BQ tables for last-touch leads and spend by channel type.
+
+    Returns weekly rows with columns: week, channel (MMM name), lt_leads, lt_spend, lt_roi.
+    Returns None if the client config has no last_touch block or on any BQ error.
+    """
+    try:
+        cfg = get_config(client_id)
+        lt_cfg = cfg.get("last_touch")
+        if not lt_cfg:
+            return None
+
+        bq_project = lt_cfg["bq_project"]
+        excluded_geos = lt_cfg.get("excluded_geos", [])
+        channel_map: dict[str, str] = lt_cfg.get("channel_map", {})
+
+        excluded_placeholder = ", ".join(f'"{g}"' for g in excluded_geos)
+
+        query = f"""
+            WITH base AS (
+              SELECT
+                DATE_TRUNC(Date, WEEK(MONDAY)) AS week,
+                Type AS bq_type,
+                SUM(Gross_Leads_New) AS leads,
+                SUM(Cost) AS spend
+              FROM `{bq_project}.freedom_solar_agg.full_funnel_unmatched`
+              WHERE Region NOT IN ({excluded_placeholder})
+                AND Type IS NOT NULL
+              GROUP BY week, bq_type
+
+              UNION ALL
+
+              SELECT
+                DATE_TRUNC(Date, WEEK(MONDAY)) AS week,
+                Type AS bq_type,
+                SUM(Gross_Leads) AS leads,
+                SUM(Cost) AS spend
+              FROM `{bq_project}.freedom_solar_hvac.full_funnel_HVAC`
+              WHERE Region NOT IN ({excluded_placeholder})
+                AND Type IS NOT NULL
+              GROUP BY week, bq_type
+            )
+            SELECT
+              week,
+              bq_type,
+              SUM(leads) AS lt_leads,
+              SUM(spend) AS lt_spend
+            FROM base
+            WHERE week < CURRENT_DATE()
+            GROUP BY week, bq_type
+            ORDER BY week, bq_type
+        """
+
+        from google.cloud import bigquery
+        # Use ADC (gcloud user credentials) for the Freedom Solar project — the
+        # moonride service_account.json has no access to freedom-solar-406415 tables.
+        # Temporarily remove GOOGLE_APPLICATION_CREDENTIALS so BQ falls back to ADC.
+        _sa_path = os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+        try:
+            bq = bigquery.Client(project=bq_project)
+            rows = list(bq.query(query).result())
+        finally:
+            if _sa_path:
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _sa_path
+        if not rows:
+            return None
+
+        df = pd.DataFrame([dict(r) for r in rows])
+        df["week"] = pd.to_datetime(df["week"])
+        df["lt_leads"] = pd.to_numeric(df["lt_leads"], errors="coerce").fillna(0)
+        df["lt_spend"] = pd.to_numeric(df["lt_spend"], errors="coerce").fillna(0)
+
+        # Map BQ type names to MMM channel names; drop unmapped types
+        df["channel"] = df["bq_type"].map(channel_map)
+        df = df.dropna(subset=["channel"]).drop(columns=["bq_type"])
+
+        # Aggregate after mapping (multiple BQ types could map to same MMM channel)
+        df = (
+            df.groupby(["week", "channel"], as_index=False)
+            .agg(lt_leads=("lt_leads", "sum"), lt_spend=("lt_spend", "sum"))
+        )
+        df["lt_roi"] = df.apply(
+            lambda r: r["lt_leads"] / r["lt_spend"] if r["lt_spend"] > 0 else None, axis=1
+        )
+        return df
+    except Exception:
+        return None
+
+
+def get_last_touch(client_id: str) -> pd.DataFrame | None:
+    """Load last-touch attribution — BigQuery only (no local fallback)."""
+    if _has_bq_credentials():
+        return load_last_touch_bq(client_id)
+    return None
+
+
 def get_contributions(client_id: str) -> pd.DataFrame | None:
     """Load contributions — BigQuery first, local file fallback."""
     if _has_bq_credentials():
