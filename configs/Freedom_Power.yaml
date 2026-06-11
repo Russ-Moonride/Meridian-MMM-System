@@ -29,12 +29,12 @@
 client_id: freedom_power
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-# Points to the processed Apr26 file which includes GQV columns and storm flags.
-# Raw source: data/raw/Freedom_Power/Freedom_MMM_data_Apr26.csv
+# Points to the processed Jun26 file which includes GQV columns and storm flags.
+# Raw source: BigQuery (2024-01-01 → 2026-06-08); GQV estimated via YoY for weeks 2026-05-04 to 2026-06-08.
 # Reddit_Cost and Reddit_Impressions are present in this processed file —
 # no data_path change is required.
-data_path: data/processed/Freedom_Power/Freedom_MMM_data_Apr26_gqv.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/freedom/Freedom_MMM_data_Apr26_gqv.csv
+data_path: data/processed/Freedom_Power/Freedom_MMM_data_Jun26_gqv.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/freedom/Freedom_MMM_data_Jun26_gqv.csv
 output_path: outputs/Freedom/
 gcs_output_path: gs://mmm-pipeline-results/clients/freedom/runs/
 
