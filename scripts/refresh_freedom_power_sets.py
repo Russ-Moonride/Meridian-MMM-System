@@ -104,7 +104,7 @@ WITH base AS (
     SUM(CASE WHEN Type = 'Prospecting' THEN Impressions ELSE 0 END) AS Prospecting_Impressions,
     NULL AS Reddit_Cost,
     NULL AS Reddit_Impressions,
-    SUM(HubSpot_Sets) AS HubSpot_Sets
+    SUM(Sets) AS HubSpot_Sets
   FROM `freedom-solar-406415.freedom_solar_hvac.full_funnel_HVAC`
   WHERE Date >= "{start_date}" AND Region != "Other"
   GROUP BY date, geo
