@@ -105,7 +105,32 @@ def download_model_from_gcs(gcs_runs_base: str, run_id: str, dest: Path) -> Path
     gcs_client = storage.Client()
     blob = gcs_client.bucket(bucket_name).blob(blob_path)
     local_path = dest / "model.pkl"
-    blob.download_to_filename(str(local_path))
+    try:
+        blob.download_to_filename(str(local_path))
+    except Exception:
+        # List what files actually exist in this run folder so the user knows what's there
+        run_prefix = f"{_parse_gcs_path(gcs_runs_base.rstrip('/'))[1]}/{run_id}/"
+        existing = [
+            b.name.split("/")[-1]
+            for b in gcs_client.list_blobs(bucket_name, prefix=run_prefix)
+        ]
+        if existing:
+            print(f"\nERROR: model.pkl not found. Files present in this run folder:")
+            for f in existing:
+                print(f"  {f}")
+            print("\nmodel.pkl was likely not uploaded when this run completed.")
+        else:
+            # List available runs for this client so user can pick a valid one
+            client_prefix = _parse_gcs_path(gcs_runs_base.rstrip('/'))[1] + "/"
+            runs = sorted({
+                b.name[len(client_prefix):].split("/")[0]
+                for b in gcs_client.list_blobs(bucket_name, prefix=client_prefix)
+            }, reverse=True)
+            print(f"\nERROR: Run folder '{run_id}' not found in GCS.")
+            print(f"Available runs for this client:")
+            for r in runs:
+                print(f"  {r}")
+        sys.exit(1)
     print(f"  ✓ Downloaded gs://{bucket_name}/{blob_path}")
     return local_path
 
