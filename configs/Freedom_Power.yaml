@@ -76,17 +76,6 @@ controls:
   - storm_tail
   - GQV_Brand
   - GQV_Generic
-  - month_jan
-  - month_feb
-  - month_mar
-  - month_apr
-  - month_may
-  - month_jun
-  - month_jul
-  - month_aug
-  - month_sep
-  - month_oct
-  - month_nov
 
 # ── Geo / population ──────────────────────────────────────────────────────────
 # Active markets after low-volume geos were dropped.
