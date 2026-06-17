@@ -36,6 +36,12 @@ channels:
   - Pmax
   - TikTok
 
+# Channels locked to historical spend in budget optimization (spend_constraint = 1.0/1.0).
+# Add any channels here that should not be reallocated during scenario planning.
+fixed_channels:
+  - Brand
+  - Retargeting
+
 # Organic channels: no spend counterpart. Columns are {name}_Views.
 organic_channels:
   - Facebook
