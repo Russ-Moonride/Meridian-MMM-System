@@ -109,7 +109,7 @@ geos_to_drop: []  # drops already applied in source CSV; update if raw data chan
 #   Loosest concentration in the model (10) to allow the posterior maximum freedom
 #   given near-total data sparsity. Analyst explicitly requested very small prior.
 prior_type: contribution
-total_media_contribution: 0.60   # 60% of Gross_Leads attributed to paid channels
+total_media_contribution: 0.55   # 55% of Gross_Leads attributed to paid channels; tightened from 0.60 after prod run showed 94% paid attribution
 concentration_default: 20.0      # medium tightness for all channels except Billboard and Reddit
 concentration_billboard: 12.0    # looser — Billboard has sparse / partial data (Austin only, 9–10 weeks)
 concentration_reddit: 10.0       # loosest — Reddit has 8 active weeks, 5 of 6 geos, ~94% zeros
@@ -144,7 +144,7 @@ organic_contribution_prior:
 
 # ── Model spec ────────────────────────────────────────────────────────────────
 # knots: 'auto' resolves to n_weeks // 2 at runtime (~61 knots for Apr26 dataset).
-knots: auto
+knots: 26  # fixed; auto (n_weeks//2=53) produced near-zero baseline (3.5%) — smoother trend anchors organic demand floor
 
 # max_lag = 4: digital-heavy channel mix (search, retargeting, prospecting).
 # Reddit is a paid social platform — typical response window is 1–2 weeks, well
