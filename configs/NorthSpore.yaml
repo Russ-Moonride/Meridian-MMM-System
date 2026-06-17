@@ -6,8 +6,8 @@
 client_id: northspore
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-data_path: data/processed/northspore/NS_mmm_data_Apr26.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/northspore/NS_mmm_data_Apr26.csv
+data_path: data/processed/northspore/NS_mmm_data_Jun26.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/northspore/NS_mmm_data_Jun26.csv
 output_path: outputs/northspore/
 gcs_output_path: gs://mmm-pipeline-results/clients/northspore/runs/
 
@@ -20,7 +20,7 @@ kpi_type: revenue
 # Date filter applied before gap-filling and feature engineering.
 # Drops the 8 weeks prior to March 2024 (sparse/ramp-up period).
 start_date: "2024-03-01"
-end_date: "2026-05-04"
+end_date: "2026-06-15"
 
 # ── Media channels (paid) ─────────────────────────────────────────────────────
 # Each name resolves to {name}_Cost and {name}_Impressions columns.
