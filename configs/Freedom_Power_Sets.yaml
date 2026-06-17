@@ -1,0 +1,246 @@
+# configs/Freedom_Power_Sets.yaml
+# Freedom Power — downstream Sets model (KPI = HubSpot_Sets)
+# Generated: 2026-06-17
+#
+# Identical to Freedom_Power.yaml except:
+#   - client_id: freedom_power_sets
+#   - kpi_column: HubSpot_Sets
+#   - data_path/gcs_data_path: point to Sets dataset
+#   - output_path: outputs/freedom_power_sets/
+#
+# Sets models are expected to have lower ESS and wider CIs than the Leads
+# model — lower volume metric with more noise. Convergence thresholds apply
+# but results should be interpreted as directional, not precise.
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+client_id: freedom_power_sets
+
+# ── Data paths ────────────────────────────────────────────────────────────────
+# Points to the processed Jun26 file which includes GQV columns and storm flags.
+# Raw source: BigQuery (2024-01-01 → 2026-06-08); GQV estimated via YoY for weeks 2026-05-04 to 2026-06-08.
+# Reddit_Cost and Reddit_Impressions are present in this processed file —
+# no data_path change is required.
+data_path: data/processed/Freedom_Power/Freedom_MMM_sets_Jun26_gqv.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/freedom/Freedom_MMM_sets_Jun26_gqv.csv
+output_path: outputs/freedom_power_sets/
+gcs_output_path: gs://mmm-pipeline-results/clients/freedom_sets/runs/
+
+# ── Data structure ────────────────────────────────────────────────────────────
+date_column: date
+geo_column: geo
+kpi_column: HubSpot_Sets
+kpi_type: non_revenue  # downstream funnel metric — lower volume than Gross_Leads
+
+# ── Media channels (paid) ─────────────────────────────────────────────────────
+# Each name is the prefix for {name}_Cost and {name}_Impressions columns.
+# Billboard added in Apr26 dataset — Austin only, 9 active weeks.
+# Reddit added in Apr26 dataset — 5 of 6 geos, 8 active weeks from 2026-03-16.
+# San Antonio has zero Reddit spend for the full 123-week history (see checklist).
+channels:
+  - Non_Brand
+  - Brand
+  - DVD
+  - Retargeting
+  - Prospecting
+  - Billboard
+  - Reddit  # NEW — paid social channel; 8 active weeks; ~94% zeros across full history
+
+# DirectMail_Impressions is in the data but has no spend column — organic channel.
+# Only 1 non-zero week in the Apr26 dataset — essentially unidentifiable.
+organic_channels:
+  - DirectMail
+organic_cols:             # overrides default {channel}_Views naming per channel
+  DirectMail: DirectMail_Impressions
+
+# ── Controls ──────────────────────────────────────────────────────────────────
+# storm_acute / storm_tail: weather event binary flags (pre-built in processed CSV)
+# GQV_Brand / GQV_Generic: Google Query Volume for branded and generic energy search terms
+# tax_credit_shift: IRA / policy-driven demand spike (binary flag: 1 from 2025-10-01)
+controls:
+  - tax_credit_shift
+  - storm_acute
+  - storm_tail
+  - GQV_Brand
+  - GQV_Generic
+
+# ── Geo / population ──────────────────────────────────────────────────────────
+# Active markets after low-volume geos were dropped.
+# Dropped geos (sparse / pilot): Carolinas, Denver, Virginia, Colorado Springs,
+#   Richmond, OOT — not present in source CSV.
+population_column: population
+geos_to_drop: []  # drops already applied in source CSV; update if raw data changes
+
+# Active geo population mapping (DMA estimates):
+#   DFW: 3,264,490 | Houston: 2,797,420 | Tampa: 2,221,240
+#   Orlando: 1,902,420 | San Antonio: 1,096,400 | Austin: 1,029,800
+
+# ── Prior specification ───────────────────────────────────────────────────────
+# Using per-channel contribution priors (Beta mode).
+# Rationale: no channel-level ROAS holdout exists; KPI is a non-revenue conversion.
+# Shares derived from prior model run (Mar26); total paid-media target = 60% of leads.
+#
+# Scale factor = 0.60 / sum(shares) ≈ 0.619 — applied to convert media shares to
+# fraction-of-total-KPI targets expected by Meridian's Beta prior.
+# (Scale factor shifted from 0.622 → 0.619 with Reddit added; effect on all other
+# derived means is <0.1 pp — no rebalancing of existing shares is warranted.)
+#
+# Billboard: low share (1%) reflects ~10% contribution in its active Austin window
+# diluted across 122 weeks × 6 geos; looser concentration (12) allows more movement
+# given sparse data.
+#
+# Reddit: share of 0.5% — half of Billboard's 1%, reflecting:
+#   (a) 8 active weeks vs. Billboard's 9–10 active weeks
+#   (b) 5 of 6 geos active (San Antonio permanently zeroed)
+#   (c) extremely zero-inflated history (~94% zeros across full 123-week frame)
+#   Loosest concentration in the model (10) to allow the posterior maximum freedom
+#   given near-total data sparsity. Analyst explicitly requested very small prior.
+prior_type: contribution
+total_media_contribution: 0.55   # 55% of Gross_Leads attributed to paid channels; tightened from 0.60 after prod run showed 94% paid attribution
+concentration_default: 20.0      # medium tightness for all channels except Billboard and Reddit
+concentration_billboard: 12.0    # looser — Billboard has sparse / partial data (Austin only, 9–10 weeks)
+concentration_reddit: 10.0       # loosest — Reddit has 8 active weeks, 5 of 6 geos, ~94% zeros
+
+channel_media_shares:            # each channel's share of total paid-media contribution
+  Prospecting:  0.26
+  Non_Brand:    0.25
+  Retargeting:  0.21
+  Brand:        0.17
+  DVD:          0.055
+  Billboard:    0.02
+  Reddit:       0.005  # NEW — 0.5% share; half of Billboard; reflects sparse coverage
+
+# Derived prior means (fraction of total KPI) — for reference:
+#   scale_factor = 0.60 / 0.970 = 0.6186
+#   Prospecting:  16.1%  | Non_Brand: 15.5% | Retargeting: 13.6%
+#   Brand:        10.5%  | DVD:        3.4% | Billboard:    0.6%
+#   Reddit:        0.3%  (NEW)
+#   Baseline (implicit): ~40%
+#
+# Note: existing channel derived means shifted by <0.1 pp vs. live config
+# (Prospecting 16.2% → 16.1%, Non_Brand 15.5% unchanged, etc.) due to
+# denominator growing from 0.960 to 0.970. Not material; no rebalancing needed.
+
+# Organic channel prior — contribution_o
+# DirectMail: 0.5% of total KPI; concentration=8 (very loose — only 1 non-zero week).
+# Posterior will likely collapse toward zero given no data signal.
+organic_contribution_prior:
+  DirectMail:
+    mu: 0.005
+    concentration: 8.0
+
+# ── Model spec ────────────────────────────────────────────────────────────────
+# knots: 'auto' resolves to n_weeks // 2 at runtime (~61 knots for Apr26 dataset).
+knots: 26  # fixed; auto (n_weeks//2=53) produced near-zero baseline (3.5%) — smoother trend anchors organic demand floor
+
+# max_lag = 4: digital-heavy channel mix (search, retargeting, prospecting).
+# Reddit is a paid social platform — typical response window is 1–2 weeks, well
+# within the current max_lag of 4. No change to max_lag is needed.
+# DVD (direct mail / video) could warrant 6 but energy sector response is fast.
+max_lag: 4
+
+media_prior_type: contribution
+media_effects_dist: log_normal  # do not change
+
+# ── MCMC settings ─────────────────────────────────────────────────────────────
+mcmc:
+  dev:                  # fast iteration — single chain, minimal samples
+    n_chains: 1
+    n_adapt: 200
+    n_burnin: 200
+    n_keep: 200
+  prod:                 # full run on Colab — 4 chains for convergence diagnostics
+    n_chains: 4
+    n_adapt: 500
+    n_burnin: 500
+    n_keep: 500
+
+max_runtime_minutes: 45
+
+# ── Analyst review checklist ──────────────────────────────────────────────────
+# Before running, verify:
+#
+# EXISTING ITEMS (carried through from live config):
+#
+# [ ] channel_media_shares: these are from the Mar26 model run — validate they still
+#     look reasonable after inspecting Apr26 posteriors.
+#
+# [ ] total_media_contribution (0.60): confirms with industry benchmarks (50–70%).
+#     Adjust if Apr26 posterior shifts significantly.
+#
+# [ ] concentration_default (20.0): check posterior vs. prior overlap after first
+#     dev run. If posteriors hug the prior, loosen to 10–15.
+#
+# [ ] concentration_billboard (12.0): Billboard is Austin-only, 9 active weeks.
+#     Inspect posterior carefully — sparse data may cause weak identification.
+#
+# [ ] max_lag (4): after first full run, inspect carryover curves. If DVD or Brand
+#     show heavy tail past week 4, bump to 6 and re-run.
+#
+# [ ] GQV controls: confirm GQV_Brand and GQV_Generic are scaled appropriately
+#     in the processed CSV (check data-transformer output / EDA report).
+#
+# [ ] tax_credit_shift: binary 0/1 flag (1 from 2025-10-01 onward) — no scaling needed.
+#
+# [ ] storm_acute / storm_tail: confirm binary 0/1 flags in processed CSV.
+#
+# [ ] geos_to_drop: if fresher CSV includes Carolinas, Denver, Virginia, Colorado
+#     Springs, Richmond, OOT — add them here so the pipeline filters before model fit.
+#
+# NEW ITEMS — REDDIT:
+#
+# [ ] Reddit identification risk: with only 8 active weeks of data and ~94% zeros,
+#     Meridian has very limited signal to estimate Reddit's contribution independently.
+#     After the first dev run, check whether the Reddit posterior is meaningfully
+#     different from the prior. If the posterior closely matches the prior (prior
+#     concentration=10, mu=0.003 derived), Reddit is not identified by the data.
+#     In that case, consider: (a) holding Reddit out of this run entirely and
+#     re-evaluating after 3–6 more months of data, or (b) including it with this
+#     small prior as a placeholder for continuity. Analyst must decide.
+#
+# [ ] concentration_reddit (10.0): this is the loosest concentration in the model,
+#     chosen to give the posterior maximum freedom given sparse data. After the dev
+#     run, compare posterior distribution to the prior. If the posterior is narrower
+#     than the prior and peaks at a plausible value, Reddit may be weakly identified.
+#     If the posterior is nearly identical to the prior, the channel is not identified.
+#
+# [ ] Reddit share (0.005): this is a judgment call anchored to Billboard's share
+#     (0.01) and halved to reflect thinner coverage. There is no model-run evidence
+#     for Reddit yet (it is a new channel). Revisit this share after the first full
+#     run once posterior estimates are available.
+#
+# [ ] San Antonio Reddit zeroing: the transform log confirms that 2 rows
+#     (2026-03-16 and 2026-03-23) had Reddit_Impressions > 0 with Reddit_Cost = $0
+#     and were zeroed out. San Antonio therefore has zero Reddit signal for all
+#     123 weeks. Confirm with the media team that no Reddit spend was placed in
+#     San Antonio — if organic/earned Reddit impressions should be modeled, a
+#     different treatment (e.g. a separate organic signal) would be needed.
+#
+# [ ] Reddit column names in processed CSV: confirmed as `Reddit_Cost` and
+#     `Reddit_Impressions` (verified from data/processed/Freedom_Power/
+#     Freedom_MMM_data_Apr26_gqv.csv column inventory). The channel prefix `Reddit`
+#     resolves correctly to these columns.
+#
+# [ ] Prospecting spike (Tampa and Orlando, 2026-04): values exceed mean + 3*std
+#     during 2026-04-06 through 2026-04-27. EDA flagged this as a genuine budget
+#     ramp-up. Confirm with client before using this data for optimization
+#     recommendations — if the April values were anomalous rather than intentional,
+#     they could inflate the Prospecting contribution estimate.
+#
+# [ ] Billboard flat value: Austin Billboard_Cost = $32,900 and
+#     Billboard_Impressions = 845,515 exactly for all 10 consecutive active weeks
+#     (2026-03-02 through 2026-05-04). Confirm with client whether this is a
+#     fixed-rate OOH contract or whether weekly actuals are available.
+
+# ── Last-touch attribution (triangulation) ────────────────────────────────────
+# BQ source tables for last-touch leads and spend, used in the attribution page.
+# channel_map translates raw BQ Type values to MMM channel names.
+# Billboard, Reddit, DirectMail have no last-touch counterpart and are excluded.
+last_touch:
+  bq_project: freedom-solar-406415
+  excluded_geos: [Carolinas, Denver, Virginia, Colorado Springs, Richmond, OOT, Other]
+  channel_map:
+    Brand: Brand
+    Non-Brand: Non_Brand
+    DVD: DVD
+    Retargeting: Retargeting
+    Prospecting: Prospecting
