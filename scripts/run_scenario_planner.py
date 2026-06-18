@@ -48,6 +48,31 @@ from google.cloud import storage  # noqa: E402
 import pandas as pd  # noqa: E402
 
 
+def _patch_batch_size() -> None:
+    """
+    Workaround for a packaging bug in google-meridian where
+    budget_optimization_processor.py references a `batch_size` field that
+    is absent from the shipped protobuf-generated class.
+    Dynamically strips any `batch_size` line from to_proto() so the proto
+    constructor call succeeds.
+    """
+    import inspect, textwrap
+    import meridian.schema.processors.budget_optimization_processor as _bop
+    import meridian.schema.protos.budget_optimization_pb2 as _bpb
+
+    proto_fields = {f.name for f in _bpb.BudgetOptimizationSpec.DESCRIPTOR.fields}
+    if 'batch_size' in proto_fields:
+        return  # no patch needed — versions are in sync
+
+    src = inspect.getsource(_bop.BudgetOptimizationSpec.to_proto)
+    filtered = '\n'.join(l for l in src.splitlines() if 'batch_size' not in l)
+    patched_src = textwrap.dedent(filtered)
+    local_ns: dict = {}
+    exec(compile(patched_src, '<patched_to_proto>', 'exec'), vars(_bop), local_ns)  # noqa: S102
+    _bop.BudgetOptimizationSpec.to_proto = local_ns['to_proto']
+    print("  [patch] batch_size removed from BudgetOptimizationSpec.to_proto")
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Run Meridian scenario planner from a completed model run."
@@ -199,6 +224,8 @@ def upload_to_gcs(
 
 
 def main() -> None:
+    _patch_batch_size()
+
     args = parse_args()
     t_start = time.time()
 
