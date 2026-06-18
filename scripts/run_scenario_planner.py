@@ -32,8 +32,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
-
 from src.data_prep import load_config  # noqa: E402
 
 from meridian.model import model  # noqa: E402
