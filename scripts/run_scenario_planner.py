@@ -58,7 +58,13 @@ def _patch_batch_size() -> None:
     """
     import inspect, textwrap
     import meridian.schema.processors.budget_optimization_processor as _bop
-    import meridian.schema.protos.budget_optimization_pb2 as _bpb
+
+    # Find budget_pb from the processor module's own namespace — avoids
+    # hardcoding the import path which differs between meridian versions.
+    _bpb = vars(_bop).get('budget_pb')
+    if _bpb is None:
+        print("  [patch] budget_pb not found in processor module — skipping")
+        return
 
     proto_fields = {f.name for f in _bpb.BudgetOptimizationSpec.DESCRIPTOR.fields}
     if 'batch_size' in proto_fields:
