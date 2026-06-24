@@ -1,0 +1,133 @@
+# configs/Janessa_Leone.yaml
+# Janessa Leone — e-commerce brand
+# KPI: Revenue
+# Created: 2026-06-24
+# Status: SKELETON — data not yet ingested; all priors/paths are placeholders
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+client_id: janessa_leone
+
+# ── Data paths ────────────────────────────────────────────────────────────────
+# TODO: update filenames once data is pulled from BigQuery and processed
+data_path: data/processed/janessa_leone/JL_mmm_data.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/janessa_leone/JL_mmm_data.csv
+output_path: outputs/janessa_leone/
+gcs_output_path: gs://mmm-pipeline-results/clients/janessa_leone/runs/
+
+# ── Data structure ────────────────────────────────────────────────────────────
+date_column: date
+kpi_column: Revenue
+kpi_type: revenue
+
+# TODO: confirm date range after data pull
+# start_date: "YYYY-MM-DD"
+# end_date:   "YYYY-MM-DD"
+
+# Geo: TBD — decision pending data review.
+# If national single-geo: remove geo_column and population_column entirely.
+# If multi-geo: set geo_column to the name of the geo column in the CSV
+#   and populate population_column.
+# geo_column: geo
+# population_column: population
+# geos_to_drop: []
+
+# ── Media channels (paid) ─────────────────────────────────────────────────────
+# Each name resolves to {name}_Cost and {name}_Impressions columns in the CSV.
+# Final list TBD — some channels may be dropped after EDA (sparse data, overlap).
+# Note: "Brand Shopping", "Social - Paid" → clean snake_case column names required.
+channels:
+  - Brand
+  - Non_Brand
+  - Brand_Shopping
+  - Prospecting
+  - Retargeting
+  - Remarketing
+  - Pinterest
+  - Affiliate
+  - Social_Paid
+
+# TODO: decide which channels (if any) should be fixed in budget optimization
+fixed_channels: []
+
+# ── Organic channels ──────────────────────────────────────────────────────────
+# Default column naming: {channel}_Views. Override with organic_cols if different.
+organic_channels:
+  - Social_Organic
+
+# ── Controls ──────────────────────────────────────────────────────────────────
+# TODO: identify available control variables after EDA
+# Candidates: black_friday (computed), promo flags, seasonality indicators
+controls:
+  - black_friday
+
+# ── Prior specification ───────────────────────────────────────────────────────
+# Using ROI priors (same framework as NorthSpore — revenue KPI).
+# Ranges represent 95% credible interval for each channel's ROI.
+# ALL RANGES ARE PLACEHOLDERS — validate against:
+#   (a) posterior from first dev run
+#   (b) industry benchmarks for e-commerce
+#   (c) any holdout test results the client can share
+#
+# Prior archetypes used:
+#   Brand / Non_Brand / Brand_Shopping: paid search — typically higher ROI (demand capture)
+#   Retargeting / Remarketing: warm audiences — moderate-high ROI
+#   Prospecting: broad reach — lower ROI
+#   Pinterest: visual social — moderate, often lower than search
+#   Affiliate: performance-based, variable; treat similarly to Prospecting
+#   Social_Paid: paid social (likely Meta) — moderate ROI; widen if spend is concentrated
+prior_type: roi
+prior_roi_ranges:
+  Brand:         [1.5,  9.0]   # PLACEHOLDER — paid search, branded terms
+  Non_Brand:     [1.5,  8.0]   # PLACEHOLDER — paid search, generic terms
+  Brand_Shopping:[2.0,  9.0]   # PLACEHOLDER — shopping, branded; high purchase intent
+  Prospecting:   [0.5,  4.0]   # PLACEHOLDER — broad reach, lower incremental lift expected
+  Retargeting:   [1.5,  8.0]   # PLACEHOLDER — warm audience
+  Remarketing:   [1.5,  8.0]   # PLACEHOLDER — warm audience (confirm vs Retargeting overlap)
+  Pinterest:     [0.5,  4.0]   # PLACEHOLDER — visual social; widen if data is sparse
+  Affiliate:     [0.5,  5.0]   # PLACEHOLDER — performance channel; may be hard to identify
+  Social_Paid:   [0.8,  5.0]   # PLACEHOLDER — paid social (Meta?); adjust once channel confirmed
+prior_roi_mass_percent: 0.95
+
+# ── Model spec ────────────────────────────────────────────────────────────────
+# knots: start with 26 (one every ~4 weeks for a 2-year series). Adjust if trend
+#   is unusually smooth or wiggly after first dev run.
+knots: 26
+# max_lag: 6 is standard for e-commerce. Reduce to 4 if channel mix is digital-heavy.
+max_lag: 6
+adstock_decay_spec: geometric
+media_effects_dist: log_normal
+
+# ── MCMC settings ─────────────────────────────────────────────────────────────
+mcmc:
+  dev:
+    n_chains: 1
+    n_adapt: 200
+    n_burnin: 200
+    n_keep: 200
+  prod:
+    n_chains: 4
+    n_adapt: 500
+    n_burnin: 500
+    n_keep: 500
+
+max_runtime_minutes: 45
+
+# ── Analyst review checklist ──────────────────────────────────────────────────
+# Before first dev run, verify:
+#
+# [ ] Data pulled from BigQuery and saved to data/raw/janessa_leone/
+# [ ] EDA report reviewed — data quality, date range, zero-inflation by channel
+# [ ] Geo decision made: national vs. multi-geo (update/remove geo_column above)
+# [ ] Channel list finalized — drop any with >85% zeros or insufficient data
+# [ ] Retargeting vs. Remarketing: confirm these are distinct channels; if substantial
+#     overlap in targeting definition, consider merging into one
+# [ ] Affiliate identification: performance channels can be difficult for MMM to
+#     identify — check spend variability and zero-inflation after EDA
+# [ ] Social_Paid column naming: confirm raw column is Social_Paid_Cost / Social_Paid_Impressions
+#     (or whatever naming comes out of the BQ pull)
+# [ ] Social_Organic column naming: default is Social_Organic_Views — confirm in CSV
+# [ ] ROI prior ranges: validate after first dev run; adjust any channel where
+#     posterior hugs the prior (indicates non-identification)
+# [ ] black_friday: computed from date — no CSV column needed
+# [ ] Date range: set start_date / end_date after reviewing data length and ramp-up period
+# [ ] GCS paths: confirm mmm-pipeline-results bucket has janessa_leone prefix set up
