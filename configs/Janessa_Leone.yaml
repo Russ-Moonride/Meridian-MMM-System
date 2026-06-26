@@ -23,18 +23,12 @@ kpi_type: revenue
 # start_date: "YYYY-MM-DD"
 # end_date:   "YYYY-MM-DD"
 
-# Geo: TBD — decision pending data review.
-# If national single-geo: remove geo_column and population_column entirely.
-# If multi-geo: set geo_column to the name of the geo column in the CSV
-#   and populate population_column.
-# geo_column: geo
-# population_column: population
-# geos_to_drop: []
+# National single-series — no geo dimension.
+# geo_column and population_column are intentionally omitted.
 
 # ── Media channels (paid) ─────────────────────────────────────────────────────
 # Each name resolves to {name}_Cost and {name}_Impressions columns in the CSV.
-# Final list TBD — some channels may be dropped after EDA (sparse data, overlap).
-# Note: "Brand Shopping", "Social - Paid" → clean snake_case column names required.
+# ShopMy/AWIN _Impressions columns contain Clicks (not ad impressions).
 channels:
   - Brand
   - Non_Brand
@@ -43,10 +37,9 @@ channels:
   - Retargeting
   - Remarketing
   - Pinterest
-  - Affiliate
-  - Social_Paid
+  - ShopMy
+  - AWIN
 
-# TODO: decide which channels (if any) should be fixed in budget optimization
 fixed_channels: []
 
 # ── Organic channels ──────────────────────────────────────────────────────────
@@ -61,31 +54,30 @@ controls:
   - black_friday
 
 # ── Prior specification ───────────────────────────────────────────────────────
-# Using ROI priors (same framework as NorthSpore — revenue KPI).
+# ROI priors anchored from last-touch attribution with directional bias adjustments.
 # Ranges represent 95% credible interval for each channel's ROI.
-# ALL RANGES ARE PLACEHOLDERS — validate against:
-#   (a) posterior from first dev run
-#   (b) industry benchmarks for e-commerce
-#   (c) any holdout test results the client can share
 #
-# Prior archetypes used:
-#   Brand / Non_Brand / Brand_Shopping: paid search — typically higher ROI (demand capture)
-#   Retargeting / Remarketing: warm audiences — moderate-high ROI
-#   Prospecting: broad reach — lower ROI
-#   Pinterest: visual social — moderate, often lower than search
-#   Affiliate: performance-based, variable; treat similarly to Prospecting
-#   Social_Paid: paid social (likely Meta) — moderate ROI; widen if spend is concentrated
+# LT estimates (for reference):
+#   Prospecting 3.08 | Non-Brand 4.0 | Brand Shopping 5.0 | Brand 10.0
+#   Remarketing 11.18 | Retargeting 2.19 | AWIN 3.29 | ShopMy 13.32 | Pinterest 1.5
+#
+# Bias adjustments applied:
+#   Paid search (Brand, Non-Brand, Brand Shopping): LT over-credits -> anchor below LT
+#   Prospecting: LT under-credits -> use LT as floor, extend upward
+#   Retargeting / Remarketing: LT over-credits lower funnel -> anchor below LT
+#   Affiliate (ShopMy, AWIN): last-click massively over-credits -> range well below LT
+#   Pinterest: LT under-credits upper funnel; very low volume -> wide range
 prior_type: roi
 prior_roi_ranges:
-  Brand:         [1.5,  9.0]   # PLACEHOLDER — paid search, branded terms
-  Non_Brand:     [1.5,  8.0]   # PLACEHOLDER — paid search, generic terms
-  Brand_Shopping:[2.0,  9.0]   # PLACEHOLDER — shopping, branded; high purchase intent
-  Prospecting:   [0.5,  4.0]   # PLACEHOLDER — broad reach, lower incremental lift expected
-  Retargeting:   [1.5,  8.0]   # PLACEHOLDER — warm audience
-  Remarketing:   [1.5,  8.0]   # PLACEHOLDER — warm audience (confirm vs Retargeting overlap)
-  Pinterest:     [0.5,  4.0]   # PLACEHOLDER — visual social; widen if data is sparse
-  Affiliate:     [0.5,  5.0]   # PLACEHOLDER — performance channel; may be hard to identify
-  Social_Paid:   [0.8,  5.0]   # PLACEHOLDER — paid social (Meta?); adjust once channel confirmed
+  Brand:         [1.5,  8.0]   # LT=10.0 -- over-credited (captures organic intent)
+  Non_Brand:     [1.5,  7.0]   # LT=4.0  -- reasonable LT signal; symmetric range
+  Brand_Shopping:[1.5,  7.0]   # LT=5.0  -- over-credited; lower anchor
+  Prospecting:   [1.5,  7.0]   # LT=3.08 -- LT under-credits; use as floor, extend up
+  Retargeting:   [0.8,  5.0]   # LT=2.19 -- over-credited + sparse; wide, shifted down
+  Remarketing:   [1.5,  8.0]   # LT=11.18 -- heavily over-credited; anchor well below LT
+  Pinterest:     [0.3,  4.0]   # LT=1.5  -- LT under-credits; very low volume -> wide range
+  ShopMy:        [0.5,  6.0]   # LT=13.32 -- influencer affiliate; LT meaningless here
+  AWIN:          [0.5,  4.5]   # LT=3.29  -- affiliate last-click; over-credited
 prior_roi_mass_percent: 0.95
 
 # ── Model spec ────────────────────────────────────────────────────────────────
