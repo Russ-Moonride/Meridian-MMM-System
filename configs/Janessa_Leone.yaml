@@ -9,8 +9,8 @@ client_id: janessa_leone
 
 # ── Data paths ────────────────────────────────────────────────────────────────
 # TODO: update filenames once data is pulled from BigQuery and processed
-data_path: data/processed/janessa_leone/JL_mmm_data.csv
-gcs_data_path: gs://mmm-pipeline-results/clients/janessa_leone/JL_mmm_data.csv
+data_path: data/processed/janessa_leone/JL_mmm_data_Jun26.csv
+gcs_data_path: gs://mmm-pipeline-results/clients/janessa_leone/JL_mmm_data_Jun26.csv
 output_path: outputs/janessa_leone/
 gcs_output_path: gs://mmm-pipeline-results/clients/janessa_leone/runs/
 
@@ -43,9 +43,8 @@ channels:
 fixed_channels: []
 
 # ── Organic channels ──────────────────────────────────────────────────────────
-# Default column naming: {channel}_Views. Override with organic_cols if different.
-organic_channels:
-  - Social_Organic
+# No organic channels in current dataset. Add Social_Organic_Views if/when data is available.
+organic_channels: []
 
 # ── Controls ──────────────────────────────────────────────────────────────────
 # TODO: identify available control variables after EDA
@@ -71,7 +70,7 @@ prior_type: roi
 prior_roi_ranges:
   Brand:         [1.5,  8.0]   # LT=10.0 -- over-credited (captures organic intent)
   Non_Brand:     [1.5,  7.0]   # LT=4.0  -- reasonable LT signal; symmetric range
-  Brand_Shopping:[1.5,  7.0]   # LT=5.0  -- over-credited; lower anchor
+  Brand_Shopping: [1.5,  7.0]  # LT=5.0  -- over-credited; lower anchor
   Prospecting:   [1.5,  7.0]   # LT=3.08 -- LT under-credits; use as floor, extend up
   Retargeting:   [0.8,  5.0]   # LT=2.19 -- over-credited + sparse; wide, shifted down
   Remarketing:   [1.5,  8.0]   # LT=11.18 -- heavily over-credited; anchor well below LT

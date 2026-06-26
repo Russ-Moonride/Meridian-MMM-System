@@ -102,9 +102,12 @@ def main() -> None:
     print("1/4  Preparing data …")
     t1 = time.time()
     df = prepare_data(config)
-    n_geos  = df[config["geo_column"]].nunique()
     n_weeks = df[config["date_column"]].nunique()
-    print(f"     {n_geos} geos × {n_weeks} weeks  ({time.time() - t1:.1f}s)\n")
+    if config.get("geo_column"):
+        n_geos = df[config["geo_column"]].nunique()
+        print(f"     {n_geos} geos × {n_weeks} weeks  ({time.time() - t1:.1f}s)\n")
+    else:
+        print(f"     national × {n_weeks} weeks  ({time.time() - t1:.1f}s)\n")
 
     # ── 2. Build model ────────────────────────────────────────────────────────
     print("2/4  Building model …")

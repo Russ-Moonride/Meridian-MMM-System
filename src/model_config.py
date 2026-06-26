@@ -27,7 +27,7 @@ tfd = tfp.distributions
 def build_input_data(df: pd.DataFrame, config: dict[str, Any]):
     """Assemble a Meridian InputData from a prepared DataFrame and config."""
     date_col    = config["date_column"]
-    geo_col     = config["geo_column"]
+    geo_col     = config.get("geo_column")           # None for national (no-geo) models
     kpi_col     = config["kpi_column"]
     kpi_type    = config.get("kpi_type", "revenue")
     channels    = config["channels"]
@@ -38,15 +38,18 @@ def build_input_data(df: pd.DataFrame, config: dict[str, Any]):
     # Only pass controls that exist in the DataFrame (black_friday is computed by data_prep)
     actual_controls = [c for c in controls if c in df.columns]
 
+    # geo_kwargs: pass geo_col only for multi-geo models; omit for national
+    geo_kwargs = {"geo_col": geo_col} if geo_col else {}
+
     builder = data_frame_input_data_builder.DataFrameInputDataBuilder(kpi_type=kpi_type)
-    builder = builder.with_kpi(df, kpi_col=kpi_col, time_col=date_col, geo_col=geo_col)
+    builder = builder.with_kpi(df, kpi_col=kpi_col, time_col=date_col, **geo_kwargs)
     builder = builder.with_media(
         df,
         media_channels=channels,
         media_spend_cols=[f"{c}_Cost" for c in channels],
         media_cols=[f"{c}_Impressions" for c in channels],
         time_col=date_col,
-        geo_col=geo_col,
+        **geo_kwargs,
     )
     if organic_chs:
         organic_col_map = config.get("organic_cols", {})
@@ -55,17 +58,17 @@ def build_input_data(df: pd.DataFrame, config: dict[str, Any]):
             organic_media_cols=[organic_col_map.get(c, f"{c}_Views") for c in organic_chs],
             organic_media_channels=organic_chs,
             media_time_col=date_col,
-            geo_col=geo_col,
+            **geo_kwargs,
         )
     if actual_controls:
         builder = builder.with_controls(
             df,
             control_cols=actual_controls,
             time_col=date_col,
-            geo_col=geo_col,
+            **geo_kwargs,
         )
     if pop_col in df.columns:
-        builder = builder.with_population(df, population_col=pop_col, geo_col=geo_col)
+        builder = builder.with_population(df, population_col=pop_col, **geo_kwargs)
 
     return builder.build()
 

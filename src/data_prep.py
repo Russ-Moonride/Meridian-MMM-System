@@ -77,7 +77,7 @@ def prepare_data(config: dict[str, Any]) -> pd.DataFrame:
         population contains zeros.
     """
     date_col     = config["date_column"]
-    geo_col      = config["geo_column"]
+    geo_col      = config.get("geo_column")          # None for national (no-geo) models
     kpi_col      = config["kpi_column"]
     channels     = config["channels"]
     organic_chs  = config.get("organic_channels", [])
@@ -107,38 +107,38 @@ def prepare_data(config: dict[str, Any]) -> pd.DataFrame:
     # Subtracting weekday() days always lands on Monday (weekday 0).
     df[date_col] = df[date_col] - pd.to_timedelta(df[date_col].dt.weekday, unit="D")
 
-    # ── 4. Perfect (date × geo) index ─────────────────────────────────────────
-    # Meridian requires every geo to have an entry for every time point.
-    # Any (date, geo) combination absent from the source CSV is injected and
-    # filled with 0 for spend / KPI / organic columns.
-    #
-    # Population is a per-geo constant, so propagate it within each geo
-    # BEFORE zeroing everything else — otherwise new rows would inherit 0.
-    all_dates = sorted(df[date_col].unique())
-    all_geos  = sorted(df[geo_col].unique())
+    # ── 4. Perfect index ──────────────────────────────────────────────────────
+    if geo_col:
+        # Multi-geo: build full (date × geo) cross-product and gap-fill.
+        # Population is propagated per-geo before zero-filling so newly
+        # created rows inherit the correct constant value.
+        all_dates = sorted(df[date_col].unique())
+        all_geos  = sorted(df[geo_col].unique())
 
-    perfect = pd.DataFrame(
-        pd.MultiIndex.from_product(
-            [all_dates, all_geos], names=[date_col, geo_col]
-        ).to_frame(index=False)
-    )
-    df = perfect.merge(df, on=[date_col, geo_col], how="left")
+        perfect = pd.DataFrame(
+            pd.MultiIndex.from_product(
+                [all_dates, all_geos], names=[date_col, geo_col]
+            ).to_frame(index=False)
+        )
+        df = perfect.merge(df, on=[date_col, geo_col], how="left")
 
-    if pop_col in df.columns:
-        df[pop_col] = (
-            df.groupby(geo_col)[pop_col]
-            .transform(lambda s: s.ffill().bfill())
+        if pop_col in df.columns:
+            df[pop_col] = (
+                df.groupby(geo_col)[pop_col]
+                .transform(lambda s: s.ffill().bfill())
+            )
+
+        df = (
+            df.fillna(0)
+            .sort_values([geo_col, date_col])
+            .reset_index(drop=True)
         )
 
-    df = (
-        df.fillna(0)
-        .sort_values([geo_col, date_col])
-        .reset_index(drop=True)
-    )
-
-    # ── 5. Drop low-volume / excluded geos ────────────────────────────────────
-    if geos_to_drop:
-        df = df[~df[geo_col].isin(geos_to_drop)].reset_index(drop=True)
+        if geos_to_drop:
+            df = df[~df[geo_col].isin(geos_to_drop)].reset_index(drop=True)
+    else:
+        # National model: single time series, just sort and fill any gaps.
+        df = df.fillna(0).sort_values(date_col).reset_index(drop=True)
 
     # ── 6. Black Friday indicator ──────────────────────────────────────────────
     # Computed from the calendar rather than read from CSV, because the raw
@@ -218,7 +218,7 @@ def _validate(df: pd.DataFrame, config: dict[str, Any]) -> None:
     Raises ValueError with a specific message on the first failure found.
     """
     date_col  = config["date_column"]
-    geo_col   = config["geo_column"]
+    geo_col   = config.get("geo_column")
     kpi_col   = config["kpi_column"]
     channels  = config["channels"]
     organic   = config.get("organic_channels", [])
@@ -227,7 +227,8 @@ def _validate(df: pd.DataFrame, config: dict[str, Any]) -> None:
     # Required columns must exist
     organic_col_map = config.get("organic_cols", {})
     required = (
-        [date_col, geo_col, kpi_col]
+        ([date_col, geo_col] if geo_col else [date_col])
+        + [kpi_col]
         + [f"{c}_Cost"        for c in channels]
         + [f"{c}_Impressions" for c in channels]
         + [organic_col_map.get(c, f"{c}_Views") for c in organic]
