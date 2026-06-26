@@ -229,7 +229,7 @@ def extract_outputs(
         "completed_at": completed_at,
         "client_id":    client_id,
         "n_weeks":      int(df[date_col].nunique()),
-        "n_geos":       int(df[config["geo_column"]].nunique()),
+        "n_geos":       int(df[config["geo_column"]].nunique()) if config.get("geo_column") else 1,
         "n_channels":   len(channels),
         "model_type":   model_type,
     }
