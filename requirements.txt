@@ -1,7 +1,7 @@
 # Core modeling
 tensorflow>=2.16
 tensorflow-probability>=0.24
-google-meridian
+google-meridian==1.7.0
 
 # Data & numerics
 numpy>=1.24
