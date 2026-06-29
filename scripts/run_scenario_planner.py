@@ -45,27 +45,29 @@ from scenarioplanner.converters.dataframe import dataframe_model_converter  # no
 from scenarioplanner import mmm_ui_proto_generator as mmm_ui_gen  # noqa: E402
 
 
-class MonthlyIncludeLastGenerator(date_range_bucketing.DateRangeBucketer):
+def _monthly_include_last(self):
     """
-    Like MonthlyDateRangeGenerator but also yields the trailing partial month.
+    Patched generate_date_intervals for MonthlyDateRangeGenerator.
 
-    Meridian's built-in version skips the last month because it only yields
-    when the month flips (so the final month never triggers). This subclass
-    adds one extra yield after the loop so an in-progress month (e.g. June
-    when data ends June 22) still gets its own breakdown.
+    Meridian's built-in version only yields when the month flips, so the
+    trailing partial month (e.g. June when data ends June 22) is silently
+    skipped. This patch adds one extra yield after the loop.
+
+    Applied as a monkey-patch so the class identity stays intact — scenarioplanner's
+    create_tag validates against the original class name and rejects subclasses.
     """
+    start_date = self._input_dates[0]
+    for date in self._input_dates:
+        if date.month != start_date.month:
+            if start_date.day <= 7:
+                yield (start_date, date)
+            start_date = date
+    last_date = self._input_dates[-1]
+    if start_date.day <= 7 and start_date != last_date:
+        yield (start_date, last_date)
 
-    def generate_date_intervals(self):
-        start_date = self._input_dates[0]
-        for date in self._input_dates:
-            if date.month != start_date.month:
-                if start_date.day <= 7:
-                    yield (start_date, date)
-                start_date = date
-        # Yield the trailing month even if it's partial
-        last_date = self._input_dates[-1]
-        if start_date.day <= 7 and start_date != last_date:
-            yield (start_date, last_date)
+
+date_range_bucketing.MonthlyDateRangeGenerator.generate_date_intervals = _monthly_include_last
 
 from google.cloud import storage  # noqa: E402
 import pandas as pd  # noqa: E402
@@ -307,7 +309,7 @@ def main() -> None:
         if args.quarterly:
             time_breakdown_generators.append(date_range_bucketing.QuarterlyDateRangeGenerator)
         if args.monthly:
-            time_breakdown_generators.append(MonthlyIncludeLastGenerator)
+            time_breakdown_generators.append(date_range_bucketing.MonthlyDateRangeGenerator)
 
         fixed_channels = set(config.get("fixed_channels", []))
         channel_constraints = [
