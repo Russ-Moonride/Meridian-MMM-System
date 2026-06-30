@@ -51,6 +51,7 @@ organic_channels: []
 # Candidates: black_friday (computed), promo flags, seasonality indicators
 controls:
   - black_friday
+  - promo_intensity
 
 # ── Prior specification ───────────────────────────────────────────────────────
 # ROI priors anchored from last-touch attribution with directional bias adjustments.
