@@ -43,8 +43,9 @@ channels:
 fixed_channels: []
 
 # ── Organic channels ──────────────────────────────────────────────────────────
-# No organic channels in current dataset. Add Social_Organic_Views if/when data is available.
-organic_channels: []
+# Column naming: Social_Organic_Views (weekly total impressions across organic social)
+organic_channels:
+  - Social_Organic
 
 # ── Controls ──────────────────────────────────────────────────────────────────
 # TODO: identify available control variables after EDA
